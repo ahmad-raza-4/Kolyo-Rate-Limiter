@@ -1,0 +1,7 @@
+logging:
+  level:
+    com.ratelimiter: DEBUG
+
+ratelimiter:
+  performance:
+    detailed-logging: true

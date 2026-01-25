@@ -1,0 +1,10 @@
+logging:
+  level:
+    com.ratelimiter: INFO
+
+server:
+  port: ${PORT:8080}
+
+ratelimiter:
+  performance:
+    detailed-logging: false

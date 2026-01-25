@@ -5,7 +5,7 @@ spring:
     redis:
       host: localhost
       port: 6379
-      # timeout: 60000
+      timeout: 60000
 
 management:
   endpoints:
@@ -18,3 +18,33 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+  http2:
+    enabled: true
+
+
+ratelimiter:
+  default:
+    algorithm: TOKEN_BUCKET
+    capacity: 10
+    refill-rate: 10
+    refill-period-seconds: 60
+  redis:
+    key-prefix: "ratelimit"
+    config-prefix: "config"
+    ttl-seconds: 3600
+  performance:
+    metrics-enabled: true
+    detailed-logging: false
+
+logging:
+  level:
+    com.ratelimiter: DEBUG
+    org.springframework.data.redis: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
