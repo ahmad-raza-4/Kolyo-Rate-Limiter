@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.685" tests="4" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.config.RedisConfigTest" time="2.344" tests="1" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -67,12 +67,32 @@
     <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} - %msg%n"/>
     <property name="LOGGED_APPLICATION_NAME" value="[rate-limiter] "/>
   </properties>
-  <testcase name="shouldWorkWithFixedWindowAlgorithm" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.11">
-    <system-out><![CDATA[2026-01-27 00:43:15 - Could not detect default configuration classes for test class [com.ratelimiter.integration.MultiAlgorithmIntegrationTest]: MultiAlgorithmIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
-2026-01-27 00:43:15 - Found @SpringBootConfiguration com.ratelimiter.RateLimiterApplication for test class com.ratelimiter.integration.MultiAlgorithmIntegrationTest
-2026-01-27 00:43:15 - Creating container for image: redis:7-alpine
-2026-01-27 00:43:15 - Container redis:7-alpine is starting: 964a429b2f7905f0f8258b0517cb8346ed4a144a892e29883498053077e37f4e
-2026-01-27 00:43:16 - Container redis:7-alpine started in PT0.174592S
+  <testcase name="shouldConnectToRedis" classname="com.ratelimiter.config.RedisConfigTest" time="0.415">
+    <system-out><![CDATA[00:43:13.596 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.ratelimiter.config.RedisConfigTest]: RedisConfigTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:43:13.641 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.ratelimiter.RateLimiterApplication for test class com.ratelimiter.config.RedisConfigTest
+00:43:13.681 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+00:43:13.682 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+00:43:13.696 [main] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.20.4
+00:43:13.772 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+00:43:13.881 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+00:43:13.881 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+00:43:13.891 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 28.5.1
+  API Version: 1.51
+  Operating System: Docker Desktop
+  Total Memory: 7837 MB
+  Labels: 
+    com.docker.desktop.address=unix:///Users/ahmadraza/Library/Containers/com.docker.docker/Data/docker-cli.sock
+00:43:13.936 [main] INFO tc.testcontainers/ryuk:0.11.0 -- Creating container for image: testcontainers/ryuk:0.11.0
+00:43:14.007 [main] INFO org.testcontainers.utility.RegistryAuthLocator -- Credential helper/store (docker-credential-desktop) does not have credentials for https://index.docker.io/v1/
+00:43:14.065 [main] INFO tc.testcontainers/ryuk:0.11.0 -- Container testcontainers/ryuk:0.11.0 is starting: dbeba730c9586352b7f45db1bb63b1aeb1b945e8c6225463c1084ee86ea7c4ce
+00:43:14.185 [main] INFO tc.testcontainers/ryuk:0.11.0 -- Container testcontainers/ryuk:0.11.0 started in PT0.248298S
+00:43:14.187 [main] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+00:43:14.187 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+00:43:14.188 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+00:43:14.188 [main] INFO tc.redis:7-alpine -- Creating container for image: redis:7-alpine
+00:43:14.207 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine is starting: 963466db8f1189acebc70976c56474768f6c4e619c8d71ca710ee567a529af11
+00:43:14.348 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine started in PT0.160006S
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -83,16 +103,16 @@
 
  :: Spring Boot ::                (v3.4.1)
 
-2026-01-27 00:43:16 - Multiple Spring Data modules found, entering strict repository configuration mode
-2026-01-27 00:43:16 - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
-2026-01-27 00:43:16 - Finished Spring Data repository scanning in 1 ms. Found 0 Redis repository interfaces.
-2026-01-27 00:43:16 - Initializing Spring TestDispatcherServlet ''
-2026-01-27 00:43:16 - Initializing Servlet ''
-2026-01-27 00:43:16 - Exposing 3 endpoints beneath base path '/actuator'
-2026-01-27 00:43:16 - Completed initialization in 2 ms
+2026-01-27 00:43:14 - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-01-27 00:43:14 - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-01-27 00:43:14 - Finished Spring Data repository scanning in 4 ms. Found 0 Redis repository interfaces.
+2026-01-27 00:43:15 - Exposing 3 endpoints beneath base path '/actuator'
 ]]></system-out>
+    <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build what is described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/Users/ahmadraza/.m2/repository/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
   </testcase>
-  <testcase name="shouldWorkWithSlidingWindowAlgorithm" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.014"/>
-  <testcase name="shouldSwitchBetweenAlgorithms" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.013"/>
-  <testcase name="shouldWorkWithTokenBucketAlgorithm" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.021"/>
 </testsuite>

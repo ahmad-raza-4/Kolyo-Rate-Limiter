@@ -22,7 +22,7 @@ import java.util.List;
 public class FixedWindowAlgorithm implements RateLimitAlgorithm {
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private RedisScript<List> fixedWindowScript;
+    private RedisScript<List<Object>> fixedWindowScript;
 
     @PostConstruct
     public void init() throws IOException {
@@ -31,7 +31,10 @@ public class FixedWindowAlgorithm implements RateLimitAlgorithm {
             resource.getInputStream().readAllBytes(),
             StandardCharsets.UTF_8
         );
-        this.fixedWindowScript = RedisScript.of(scriptContent, List.class);
+        @SuppressWarnings("unchecked")
+        RedisScript<List<Object>> script = (RedisScript<List<Object>>) (RedisScript<?>)
+                RedisScript.of(scriptContent, List.class);
+        this.fixedWindowScript = script;
         log.info("Fixed Window Lua script loaded successfully");
     }
 

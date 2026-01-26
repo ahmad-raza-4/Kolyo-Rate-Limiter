@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.685" tests="4" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.RateLimiterApplicationTests" time="0.459" tests="1" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -67,12 +67,12 @@
     <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} - %msg%n"/>
     <property name="LOGGED_APPLICATION_NAME" value="[rate-limiter] "/>
   </properties>
-  <testcase name="shouldWorkWithFixedWindowAlgorithm" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.11">
-    <system-out><![CDATA[2026-01-27 00:43:15 - Could not detect default configuration classes for test class [com.ratelimiter.integration.MultiAlgorithmIntegrationTest]: MultiAlgorithmIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
-2026-01-27 00:43:15 - Found @SpringBootConfiguration com.ratelimiter.RateLimiterApplication for test class com.ratelimiter.integration.MultiAlgorithmIntegrationTest
-2026-01-27 00:43:15 - Creating container for image: redis:7-alpine
-2026-01-27 00:43:15 - Container redis:7-alpine is starting: 964a429b2f7905f0f8258b0517cb8346ed4a144a892e29883498053077e37f4e
-2026-01-27 00:43:16 - Container redis:7-alpine started in PT0.174592S
+  <testcase name="contextLoads" classname="com.ratelimiter.RateLimiterApplicationTests" time="0.002">
+    <system-out><![CDATA[2026-01-27 00:43:17 - Could not detect default configuration classes for test class [com.ratelimiter.RateLimiterApplicationTests]: RateLimiterApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-01-27 00:43:17 - Found @SpringBootConfiguration com.ratelimiter.RateLimiterApplication for test class com.ratelimiter.RateLimiterApplicationTests
+2026-01-27 00:43:17 - Creating container for image: redis:alpine
+2026-01-27 00:43:17 - Container redis:alpine is starting: f3773497e103cf80f6e0fe6f65abfc4763a26023061ffa0b52601d2fe2046d57
+2026-01-27 00:43:17 - Container redis:alpine started in PT0.174599S
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -83,16 +83,10 @@
 
  :: Spring Boot ::                (v3.4.1)
 
-2026-01-27 00:43:16 - Multiple Spring Data modules found, entering strict repository configuration mode
-2026-01-27 00:43:16 - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
-2026-01-27 00:43:16 - Finished Spring Data repository scanning in 1 ms. Found 0 Redis repository interfaces.
-2026-01-27 00:43:16 - Initializing Spring TestDispatcherServlet ''
-2026-01-27 00:43:16 - Initializing Servlet ''
-2026-01-27 00:43:16 - Exposing 3 endpoints beneath base path '/actuator'
-2026-01-27 00:43:16 - Completed initialization in 2 ms
+2026-01-27 00:43:17 - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-01-27 00:43:17 - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-01-27 00:43:17 - Finished Spring Data repository scanning in 1 ms. Found 0 Redis repository interfaces.
+2026-01-27 00:43:17 - Exposing 3 endpoints beneath base path '/actuator'
 ]]></system-out>
   </testcase>
-  <testcase name="shouldWorkWithSlidingWindowAlgorithm" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.014"/>
-  <testcase name="shouldSwitchBetweenAlgorithms" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.013"/>
-  <testcase name="shouldWorkWithTokenBucketAlgorithm" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.021"/>
 </testsuite>
