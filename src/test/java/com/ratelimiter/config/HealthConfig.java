@@ -20,7 +20,6 @@ public class HealthConfig {
                 // Test Redis connectivity
                 redisTemplate.getConnectionFactory()
                     .getConnection()
-                    .serverCommands()
                     .ping();
                 
                 return Health.up()
