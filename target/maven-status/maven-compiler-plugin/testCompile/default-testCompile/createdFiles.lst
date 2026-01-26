@@ -1,3 +1,4 @@
-com/ratelimiter/RateLimiterApplicationTests.class
 com/ratelimiter/config/RedisConfigTest.class
+com/ratelimiter/integration/RateLimitIntegrationTest.class
+com/ratelimiter/RateLimiterApplicationTests.class
 com/ratelimiter/algorithm/TokenBucketAlgorithmTest.class

@@ -1,3 +1,4 @@
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/RateLimiterApplicationTests.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/algorithm/TokenBucketAlgorithmTest.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/config/RedisConfigTest.java
+/Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/integration/RateLimitIntegrationTest.java
