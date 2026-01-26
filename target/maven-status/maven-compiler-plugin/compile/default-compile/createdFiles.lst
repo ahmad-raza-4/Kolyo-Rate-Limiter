@@ -1,3 +1,4 @@
+com/ratelimiter/algorithm/FixedWindowAlgorithm.class
 com/ratelimiter/service/MetricsService.class
 com/ratelimiter/service/RateLimitService.class
 com/ratelimiter/dto/RateLimitResponse$RateLimitMetadata.class
