@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,13 +27,18 @@ public class RateLimitController {
     private final RateLimitService rateLimitService;
     private final ConfigService configService;
 
+    @Value("${ratelimiter.performance.detailed-logging:false}")
+    private boolean detailedLogging;
+
     // checks if the request is allowed based on rate limit for the given key
     @PostMapping("/check")
     @Operation(summary = "Check rate limit", description = "Check if request is allowed for given key")
     public ResponseEntity<RateLimitResponse> checkRateLimit(
             @Valid @RequestBody RateLimitRequest request) {
         
-        log.debug("Rate limit check request: {}", request);
+        if (detailedLogging && log.isDebugEnabled()) {
+            log.debug("Rate limit check request: {}", request);
+        }
         RateLimitResponse response = rateLimitService.checkLimit(request);
 
         if (response.isAllowed()) {

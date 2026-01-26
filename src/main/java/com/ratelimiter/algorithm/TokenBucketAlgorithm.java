@@ -8,6 +8,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
@@ -23,6 +24,9 @@ public class TokenBucketAlgorithm {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private RedisScript<List> tokenBucketScript;
+
+    @Value("${ratelimiter.performance.detailed-logging:false}")
+    private boolean detailedLogging;
 
     @PostConstruct
     public void init() throws IOException {
@@ -87,8 +91,10 @@ public class TokenBucketAlgorithm {
                     .latencyMicros(latencyMicros)
                     .build());
 
-            log.debug("Rate limit check for key={}: allowed={}, remaining={}, latency={}μs",
+                if (detailedLogging && log.isDebugEnabled()) {
+                log.debug("Rate limit check for key={}: allowed={}, remaining={}, latency={}μs",
                     key, allowed == 1, remaining, latencyMicros);
+                }
 
             return response;
 
