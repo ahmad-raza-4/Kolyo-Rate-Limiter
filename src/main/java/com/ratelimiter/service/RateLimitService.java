@@ -61,8 +61,11 @@ public class RateLimitService {
 
     // resets the rate limit for the given key
     public void resetLimit(String key) {
+        // retrieve configuration for the key
         RateLimitConfig config = configService.getConfig(key);
+        // get the appropriate algorithm implementation
         RateLimitAlgorithm algorithm = algorithmFactory.getAlgorithm(config.getAlgorithm());
+        // reset the rate limit
         algorithm.reset(key);
     }
 }
