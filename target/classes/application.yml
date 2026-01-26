@@ -44,7 +44,7 @@ ratelimiter:
 
 logging:
   level:
-    com.ratelimiter: DEBUG
+    com.ratelimiter: WARN
     org.springframework.data.redis: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
