@@ -5,6 +5,7 @@ com/ratelimiter/dto/RateLimitResponse$RateLimitMetadata.class
 com/ratelimiter/algorithm/RateLimitAlgorithm.class
 com/ratelimiter/controller/RateLimitController.class
 com/ratelimiter/dto/RateLimitResponse.class
+com/ratelimiter/model/RateLimitConfig$1.class
 com/ratelimiter/service/ConfigService.class
 com/ratelimiter/dto/RateLimitResponse$RateLimitMetadata$RateLimitMetadataBuilder.class
 com/ratelimiter/dto/RateLimitResponse$RateLimitResponseBuilder.class
