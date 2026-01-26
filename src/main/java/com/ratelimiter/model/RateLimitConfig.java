@@ -15,19 +15,18 @@ public class RateLimitConfig {
     private String keyPattern;
     private RateLimitAlgorithm algorithm;
     
-    // Token Bucket parameters
+    // Common parameters
     private Integer capacity;
     private Double refillRate;
     private Integer refillPeriodSeconds;
     
-    // Priority for pattern matching (higher = more specific)
+    // Priority for pattern matching
     private Integer priority;
     
     // Metadata
     private Instant createdAt;
     private Instant updatedAt;
 
-    // Validation
     public void validate() {
         if (capacity == null || capacity <= 0) {
             throw new IllegalArgumentException("Capacity must be positive");
@@ -38,5 +37,31 @@ public class RateLimitConfig {
         if (refillPeriodSeconds == null || refillPeriodSeconds <= 0) {
             throw new IllegalArgumentException("Refill period must be positive");
         }
+        
+        // Algorithm-specific validation
+        if (algorithm == RateLimitAlgorithm.SLIDING_WINDOW) {
+            // Sliding window uses capacity as max requests
+            if (capacity > 10000) {
+                throw new IllegalArgumentException(
+                    "Sliding Window capacity should be <= 10000 for memory efficiency");
+            }
+        }
+    }
+
+    public String getDescription() {
+        return switch (algorithm) {
+            case TOKEN_BUCKET -> 
+                String.format("Token Bucket: %d capacity, refills %s tokens/%ds", 
+                    capacity, refillRate, refillPeriodSeconds);
+            case SLIDING_WINDOW -> 
+                String.format("Sliding Window: %d requests per %ds", 
+                    capacity, refillPeriodSeconds);
+            case FIXED_WINDOW -> 
+                String.format("Fixed Window: %d requests per %ds window", 
+                    capacity, refillPeriodSeconds);
+            case LEAKY_BUCKET -> 
+                String.format("Leaky Bucket: %d capacity, leaks %s tokens/s", 
+                    capacity, refillRate / refillPeriodSeconds);
+        };
     }
 }

@@ -17,20 +17,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = {RedisConfig.class, FixedWindowAlgorithm.class})
 @Testcontainers
+// tests for fixed window rate limiting algorithm
 class FixedWindowAlgorithmTest {
 
+    // redis test container
     @Container
     private static final GenericContainer<?> redis = 
         new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
+    // fixed window algorithm instance
     @Autowired
     private FixedWindowAlgorithm fixedWindowAlgorithm;
 
+    // redis template for test operations
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
     private RateLimitConfig testConfig;
 
+    // sets up test configuration and clears redis
     @BeforeEach
     void setUp() {
         redisTemplate.getConnectionFactory().getConnection().serverCommands().flushDb();
@@ -43,6 +48,7 @@ class FixedWindowAlgorithmTest {
                 .build();
     }
 
+    // verifies request is allowed when within capacity limit
     @Test
     void shouldAllowRequestWithinLimit() {
         String key = "test:fixed:1";
@@ -54,6 +60,7 @@ class FixedWindowAlgorithmTest {
         assertThat(response.getAlgorithm()).isEqualTo("FIXED_WINDOW");
     }
 
+    // verifies request is denied when exceeding capacity limit
     @Test
     void shouldDenyRequestExceedingLimit() {
         String key = "test:fixed:2";
@@ -70,6 +77,7 @@ class FixedWindowAlgorithmTest {
         assertThat(response.getRetryAfterSeconds()).isNotNull();
     }
 
+    // verifies counter resets after window expiration
     @Test
     void shouldResetCounterAfterWindowExpires() throws InterruptedException {
         String key = "test:fixed:3";
@@ -98,6 +106,7 @@ class FixedWindowAlgorithmTest {
         assertThat(allowedResponse.getRemainingTokens()).isEqualTo(4);
     }
 
+    // verifies correct handling of window boundary transitions
     @Test
     void shouldHandleWindowBoundaryCorrectly() throws InterruptedException {
         String key = "test:fixed:4";
@@ -122,6 +131,7 @@ class FixedWindowAlgorithmTest {
         assertThat(response.getRemainingTokens()).isEqualTo(2);
     }
 
+    // verifies fixed window uses minimal memory compared to other algorithms
     @Test
     void shouldBeMostMemoryEfficient() {
         String key = "test:fixed:5";
