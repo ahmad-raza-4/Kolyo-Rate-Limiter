@@ -97,6 +97,7 @@ public class BenchmarkService {
         List<Long> latencies = new ArrayList<>();
         AtomicInteger allowed = new AtomicInteger(0);
         AtomicInteger denied = new AtomicInteger(0);
+        AtomicInteger errors = new AtomicInteger(0);
         AtomicInteger total = new AtomicInteger(0);
 
         // create thread pool for concurrent requests
@@ -126,7 +127,6 @@ public class BenchmarkService {
                     }
                     
                     // update counters
-                    total.incrementAndGet();
                     if (response.isAllowed()) {
                         allowed.incrementAndGet();
                     } else {
@@ -136,7 +136,9 @@ public class BenchmarkService {
                 } catch (Exception e) {
                     // log errors but continue benchmark
                     log.error("Error in benchmark request {}: {}", requestNum, e.getMessage());
+                    errors.incrementAndGet();
                 } finally {
+                    total.incrementAndGet();
                     // ensure latch is decremented
                     latch.countDown();
                 }
@@ -175,7 +177,7 @@ public class BenchmarkService {
 
         // calculate throughput and error rate
         double throughputRps = (total.get() * 1000.0) / durationMs;
-        double errorRate = denied.get() / (double) total.get();
+        double errorRate = errors.get() / (double) total.get();
 
         // build final result
         BenchmarkResult result = BenchmarkResult.builder()

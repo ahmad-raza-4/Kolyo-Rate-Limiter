@@ -77,10 +77,10 @@ public class ConfigService {
         }
 
         try {
-            String algorithmStr = (String) redisTemplate.opsForHash().get(redisKey, "algorithm");
-            Integer capacity = (Integer) redisTemplate.opsForHash().get(redisKey, "capacity");
-            Double refillRate = (Double) redisTemplate.opsForHash().get(redisKey, "refillRate");
-            Integer refillPeriod = (Integer) redisTemplate.opsForHash().get(redisKey, "refillPeriodSeconds");
+            String algorithmStr = String.valueOf(redisTemplate.opsForHash().get(redisKey, "algorithm"));
+            Integer capacity = toInteger(redisTemplate.opsForHash().get(redisKey, "capacity"));
+            Double refillRate = toDouble(redisTemplate.opsForHash().get(redisKey, "refillRate"));
+            Integer refillPeriod = toInteger(redisTemplate.opsForHash().get(redisKey, "refillPeriodSeconds"));
 
             return RateLimitConfig.builder()
                     .algorithm(RateLimitAlgorithm.valueOf(algorithmStr))
@@ -103,5 +103,31 @@ public class ConfigService {
                 .refillPeriodSeconds(defaultRefillPeriod)
                 .priority(0)
                 .build();
+    }
+
+    private Integer toInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String str) {
+            return Integer.parseInt(str);
+        }
+        return Integer.parseInt(String.valueOf(value));
+    }
+
+    private Double toDouble(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value instanceof String str) {
+            return Double.parseDouble(str);
+        }
+        return Double.parseDouble(String.valueOf(value));
     }
 }

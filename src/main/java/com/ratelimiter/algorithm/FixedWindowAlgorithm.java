@@ -63,7 +63,8 @@ public class FixedWindowAlgorithm implements RateLimitAlgorithm {
                 fixedWindowScript,
                 Collections.singletonList(counterKey),
                 config.getCapacity(),
-                windowSize
+                windowSize,
+                requestedTokens
             );
 
             if (result == null || result.size() < 2) {

@@ -22,6 +22,9 @@ public class RateLimitService {
     // service for recording metrics
     private final MetricsService metricsService;
 
+    @org.springframework.beans.factory.annotation.Value("${ratelimiter.fail-open:true}")
+    private boolean failOpen;
+
     // checks rate limit for the given request
     public RateLimitResponse checkLimit(RateLimitRequest request) {
         // record start time for latency calculation
@@ -51,11 +54,18 @@ public class RateLimitService {
             // log error and record error metrics
             log.error("Error processing rate limit check for key: {}", request.getKey(), e);
             metricsService.recordError();
+            if (failOpen) {
             // fail open: allow request on error
             return RateLimitResponse.builder()
-                    .allowed(true)
-                    .remainingTokens(-1)
-                    .build();
+                .allowed(true)
+                .remainingTokens(-1)
+                .build();
+            }
+            return RateLimitResponse.builder()
+                .allowed(false)
+                .remainingTokens(0)
+                .retryAfterSeconds(0L)
+                .build();
         }
     }
 

@@ -25,7 +25,7 @@ public class TokenBucketAlgorithm implements RateLimitAlgorithm {
     // redis template for executing lua scripts
     private final RedisTemplate<String, Object> redisTemplate;
     // compiled lua script for token bucket logic
-    private RedisScript<List> tokenBucketScript;
+    private RedisScript<List<Object>> tokenBucketScript;
 
     // loads and compiles the lua script on startup
     @PostConstruct
@@ -38,7 +38,10 @@ public class TokenBucketAlgorithm implements RateLimitAlgorithm {
             StandardCharsets.UTF_8
         );
         // compile script for redis execution
-        this.tokenBucketScript = RedisScript.of(scriptContent, List.class);
+        @SuppressWarnings("unchecked")
+        RedisScript<List<Object>> script = (RedisScript<List<Object>>) (RedisScript<?>)
+            RedisScript.of(scriptContent, List.class);
+        this.tokenBucketScript = script;
         log.info("Token Bucket Lua script loaded successfully");
     }
 

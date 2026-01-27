@@ -26,7 +26,7 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
     // redis template for executing lua scripts
     private final RedisTemplate<String, Object> redisTemplate;
     // compiled lua script for sliding window logic
-    private RedisScript<List> slidingWindowScript;
+    private RedisScript<List<Object>> slidingWindowScript;
 
     // loads and compiles the lua script on startup
     @PostConstruct
@@ -39,7 +39,10 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
             StandardCharsets.UTF_8
         );
         // compile script for redis execution
-        this.slidingWindowScript = RedisScript.of(scriptContent, List.class);
+        @SuppressWarnings("unchecked")
+        RedisScript<List<Object>> script = (RedisScript<List<Object>>) (RedisScript<?>)
+            RedisScript.of(scriptContent, List.class);
+        this.slidingWindowScript = script;
         log.info("Sliding Window Lua script loaded successfully");
     }
 
@@ -77,20 +80,28 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
             );
 
             // validate script response
-            if (result == null || result.size() < 2) {
+            if (result == null || result.size() < 3) {
                 throw new IllegalStateException("invalid response from redis lua script");
             }
 
             // extract results: allowed flag, remaining requests
             int allowed = ((Number) result.get(0)).intValue();
             int remaining = ((Number) result.get(1)).intValue();
+            long oldestMs = ((Number) result.get(2)).longValue();
 
             // calculate latency in microseconds
             long latencyMicros = (System.nanoTime() - startTime) / 1000;
             
             RateLimitResponse response;
-            // calculate reset time based on config
-            Instant resetTime = Instant.now().plusSeconds(config.getRefillPeriodSeconds());
+            // calculate reset time based on oldest request in window
+            long resetAtMs;
+            if (oldestMs > 0) {
+                resetAtMs = oldestMs + windowSizeMillis;
+            } else {
+                resetAtMs = nowMillis + windowSizeMillis;
+            }
+            Instant resetTime = Instant.ofEpochMilli(resetAtMs);
+            long retryAfterSeconds = Math.max(0L, (resetAtMs - nowMillis) / 1000L);
             
             // create allowed response
             if (allowed == 1) {
@@ -104,7 +115,7 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
                 response = RateLimitResponse.denied(
                     0,
                     resetTime,
-                    config.getRefillPeriodSeconds().longValue(),
+                    retryAfterSeconds,
                     getAlgorithmType().name()
                 );
             }
