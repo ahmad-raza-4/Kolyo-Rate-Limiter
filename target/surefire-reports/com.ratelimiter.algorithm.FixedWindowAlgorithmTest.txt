@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.ratelimiter.algorithm.FixedWindowAlgorithmTest
 -------------------------------------------------------------------------------
-Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.614 s -- in com.ratelimiter.algorithm.FixedWindowAlgorithmTest
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.626 s -- in com.ratelimiter.algorithm.FixedWindowAlgorithmTest

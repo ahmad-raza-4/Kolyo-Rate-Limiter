@@ -6,7 +6,7 @@
 -- ARGV[4] = unique request ID (string)
 -- ARGV[5] = TTL in seconds (int)
 
--- Returns: {allowed (0/1), remaining_requests (int)}
+-- Returns: {allowed (0/1), remaining_requests (int), oldest_request_ms (long)}
 
 local window_key = KEYS[1]
 local max_requests = tonumber(ARGV[1])
@@ -31,8 +31,18 @@ if current_count < max_requests then
     redis.call('EXPIRE', window_key, ttl)
     
     local remaining = max_requests - current_count - 1
-    return {1, remaining}  -- allowed=1, remaining
+    local oldest = redis.call('ZRANGE', window_key, 0, 0, 'WITHSCORES')
+    local oldest_ms = 0
+    if oldest[2] then
+        oldest_ms = tonumber(oldest[2])
+    end
+    return {1, remaining, oldest_ms}  -- allowed=1, remaining, oldest
 else
     -- Deny request
-    return {0, 0}  -- allowed=0, remaining=0
+    local oldest = redis.call('ZRANGE', window_key, 0, 0, 'WITHSCORES')
+    local oldest_ms = 0
+    if oldest[2] then
+        oldest_ms = tonumber(oldest[2])
+    end
+    return {0, 0, oldest_ms}  -- allowed=0, remaining=0, oldest
 end
