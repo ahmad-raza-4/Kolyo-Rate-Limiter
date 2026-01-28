@@ -26,7 +26,7 @@ import statistics
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from http.client import HTTPConnection
 from pathlib import Path
 from typing import Dict, List, Tuple
