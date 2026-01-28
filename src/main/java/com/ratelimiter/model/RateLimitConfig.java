@@ -59,9 +59,8 @@ public class RateLimitConfig {
             case FIXED_WINDOW -> 
                 String.format("Fixed Window: %d requests per %ds window", 
                     capacity, refillPeriodSeconds);
-            case LEAKY_BUCKET -> 
-                String.format("Leaky Bucket: %d capacity, leaks %s tokens/s", 
-                    capacity, refillRate / refillPeriodSeconds);
+            default ->
+                throw new IllegalStateException("Unsupported rate limit algorithm: " + algorithm);
         };
     }
 }

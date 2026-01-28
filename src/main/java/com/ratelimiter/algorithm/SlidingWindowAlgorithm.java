@@ -17,7 +17,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-// sliding window rate limiting algorithm implementation using redis lua script
+/**
+ * Sliding Window rate limiting algorithm using Redis and a Lua script.
+ *
+ * <p>Characteristics:
+ * <ul>
+ *   <li>Accurate rolling window using a sorted set.</li>
+ *   <li>Higher memory usage than fixed window due to per-request entries.</li>
+ *   <li>More precise smoothing at the cost of extra Redis work.</li>
+ * </ul>
+ */
 @Slf4j
 @Component("slidingWindowAlgorithm")
 @RequiredArgsConstructor
@@ -126,15 +135,15 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
                     .latencyMicros(latencyMicros)
                     .build());
 
-            log.debug("sliding window check for key={}: allowed={}, remaining={}, latency={}μs",
+                log.debug("Sliding Window check for key={}: allowed={}, remaining={}, latency={}μs",
                     key, allowed == 1, remaining, latencyMicros);
 
             return response;
 
         } catch (Exception e) {
             // handle errors and throw runtime exception
-            log.error("error in sliding window algorithm for key: {}", key, e);
-            throw new RuntimeException("rate limit check failed", e);
+            log.error("Error in Sliding Window algorithm for key: {}", key, e);
+            throw new RuntimeException("Rate limit check failed", e);
         }
     }
 
@@ -151,6 +160,6 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
         String windowKey = "ratelimit:sliding:" + key;
         // delete the window from redis
         redisTemplate.delete(windowKey);
-        log.info("reset sliding window for key: {}", key);
+        log.info("Reset Sliding Window for key: {}", key);
     }
 }

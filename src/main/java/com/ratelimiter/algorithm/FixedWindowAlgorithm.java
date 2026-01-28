@@ -5,7 +5,9 @@ import com.ratelimiter.model.RateLimitConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
@@ -13,9 +15,21 @@ import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.springframework.data.redis.core.Cursor;
 
+/**
+ * Fixed Window rate limiting algorithm using Redis and a Lua script.
+ *
+ * <p>Characteristics:
+ * <ul>
+ *   <li>Efficient and simple counter per time window.</li>
+ *   <li>Can allow bursts at window boundaries (boundary effect).</li>
+ *   <li>Memory usage scales with active keys and windows.</li>
+ * </ul>
+ */
 @Slf4j
 @Component("fixedWindowAlgorithm")
 @RequiredArgsConstructor
@@ -123,7 +137,27 @@ public class FixedWindowAlgorithm implements RateLimitAlgorithm {
         // For fixed window, we need to delete all possible window keys
         // In production, you'd want a more sophisticated cleanup mechanism
         String pattern = "ratelimit:fixed:" + key + ":*";
-        redisTemplate.delete(redisTemplate.keys(pattern));
+        deleteKeysByPattern(pattern);
         log.info("Reset Fixed Window for key pattern: {}", pattern);
+    }
+
+    private void deleteKeysByPattern(String pattern) {
+        ScanOptions options = ScanOptions.scanOptions().match(pattern).count(1000).build();
+        redisTemplate.execute((RedisConnection connection) -> {
+            try (Cursor<byte[]> cursor = connection.scan(options)) {
+                List<byte[]> batch = new ArrayList<>();
+                while (cursor.hasNext()) {
+                    batch.add(cursor.next());
+                    if (batch.size() >= 500) {
+                        connection.del(batch.toArray(new byte[0][]));
+                        batch.clear();
+                    }
+                }
+                if (!batch.isEmpty()) {
+                    connection.del(batch.toArray(new byte[0][]));
+                }
+            }
+            return null;
+        });
     }
 }

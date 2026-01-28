@@ -10,7 +10,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -21,6 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.data.redis.core.Cursor;
 
 @Slf4j
 @Service
@@ -176,8 +179,10 @@ public class BenchmarkService {
                 .build();
 
         // calculate throughput and error rate
-        double throughputRps = (total.get() * 1000.0) / durationMs;
-        double errorRate = errors.get() / (double) total.get();
+        int totalCount = total.get();
+        int errorCount = errors.get();
+        double throughputRps = durationMs > 0 ? (totalCount * 1000.0) / durationMs : 0.0;
+        double errorRate = totalCount > 0 ? errorCount / (double) totalCount : 0.0;
 
         // build final result
         BenchmarkResult result = BenchmarkResult.builder()
@@ -210,6 +215,26 @@ public class BenchmarkService {
     // clears redis keys for specified algorithm before benchmark
     private void clearAlgorithmKeys(com.ratelimiter.model.RateLimitAlgorithm algorithm) {
         String pattern = "ratelimit:" + algorithm.name().toLowerCase() + ":*";
-        redisTemplate.delete(redisTemplate.keys(pattern));
+        deleteKeysByPattern(pattern);
+    }
+
+    private void deleteKeysByPattern(String pattern) {
+        ScanOptions options = ScanOptions.scanOptions().match(pattern).count(1000).build();
+        redisTemplate.execute((RedisConnection connection) -> {
+            try (Cursor<byte[]> cursor = connection.scan(options)) {
+                List<byte[]> batch = new ArrayList<>();
+                while (cursor.hasNext()) {
+                    batch.add(cursor.next());
+                    if (batch.size() >= 500) {
+                        connection.del(batch.toArray(new byte[0][]));
+                        batch.clear();
+                    }
+                }
+                if (!batch.isEmpty()) {
+                    connection.del(batch.toArray(new byte[0][]));
+                }
+            }
+            return null;
+        });
     }
 }

@@ -55,27 +55,34 @@ public class RateLimitService {
             log.error("Error processing rate limit check for key: {}", request.getKey(), e);
             metricsService.recordError();
             if (failOpen) {
-            // fail open: allow request on error
-            return RateLimitResponse.builder()
-                .allowed(true)
-                .remainingTokens(-1)
-                .build();
+                // fail open: allow request on error
+                return RateLimitResponse.builder()
+                    .allowed(true)
+                    .remainingTokens(-1)
+                    .build();
             }
+            // fail closed: ask client to retry later to avoid overload
             return RateLimitResponse.builder()
                 .allowed(false)
                 .remainingTokens(0)
-                .retryAfterSeconds(0L)
+                .retryAfterSeconds(60L)
                 .build();
         }
     }
 
     // resets the rate limit for the given key
     public void resetLimit(String key) {
-        // retrieve configuration for the key
-        RateLimitConfig config = configService.getConfig(key);
-        // get the appropriate algorithm implementation
-        RateLimitAlgorithm algorithm = algorithmFactory.getAlgorithm(config.getAlgorithm());
-        // reset the rate limit
-        algorithm.reset(key);
+        try {
+            // retrieve configuration for the key
+            RateLimitConfig config = configService.getConfig(key);
+            // get the appropriate algorithm implementation
+            RateLimitAlgorithm algorithm = algorithmFactory.getAlgorithm(config.getAlgorithm());
+            // reset the rate limit
+            algorithm.reset(key);
+        } catch (Exception e) {
+            // log error and record error metrics for reset failures
+            log.error("Error resetting rate limit for key: {}", key, e);
+            metricsService.recordError();
+        }
     }
 }
