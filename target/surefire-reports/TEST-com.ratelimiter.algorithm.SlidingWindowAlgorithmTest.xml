@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="1.606" tests="5" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.algorithm.SlidingWindowAlgorithmTest" time="2.558" tests="5" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -67,10 +67,10 @@
     <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} - %msg%n"/>
     <property name="LOGGED_APPLICATION_NAME" value="[rate-limiter] "/>
   </properties>
-  <testcase name="shouldNotAllowMoreTokensThanCapacity" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.007">
-    <system-out><![CDATA[2026-01-28 23:35:24 - Creating container for image: redis:7-alpine
-2026-01-28 23:35:24 - Container redis:7-alpine is starting: 4b30a5621c48b392ff1bbb0a66605d5e9c2ce743ebd4ea1a3abcb061c8e1bec6
-2026-01-28 23:35:25 - Container redis:7-alpine started in PT0.207899S
+  <testcase name="shouldAllowRequestWithinLimit" classname="com.ratelimiter.algorithm.SlidingWindowAlgorithmTest" time="0.01">
+    <system-out><![CDATA[2026-01-28 23:35:16 - Creating container for image: redis:7-alpine
+2026-01-28 23:35:16 - Container redis:7-alpine is starting: 4beff9dffd0753cad87db2729386333084db37bfc711a7678f1c8d3270221edb
+2026-01-28 23:35:16 - Container redis:7-alpine started in PT0.218855S
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -83,8 +83,12 @@
 
 ]]></system-out>
   </testcase>
-  <testcase name="shouldAllowRequestWithinLimit" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.002"/>
-  <testcase name="shouldDenyRequestExceedingLimit" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.008"/>
-  <testcase name="shouldHandleMultipleTokenRequests" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.002"/>
-  <testcase name="shouldRefillTokensOverTime" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="1.115"/>
+  <testcase name="shouldHandleHighConcurrency" classname="com.ratelimiter.algorithm.SlidingWindowAlgorithmTest" time="0.005"/>
+  <testcase name="shouldProvideAccurateRemainingCount" classname="com.ratelimiter.algorithm.SlidingWindowAlgorithmTest" time="0.004"/>
+  <testcase name="shouldDenyRequestExceedingLimit" classname="com.ratelimiter.algorithm.SlidingWindowAlgorithmTest" time="0.008"/>
+  <testcase name="shouldAllowRequestsAfterWindowExpires" classname="com.ratelimiter.algorithm.SlidingWindowAlgorithmTest" time="2.114">
+    <system-out><![CDATA[2026-01-28 23:35:16 - Reconnected to localhost/<unresolved>:49802
+2026-01-28 23:35:17 - Reconnected to localhost/<unresolved>:49790
+]]></system-out>
+  </testcase>
 </testsuite>

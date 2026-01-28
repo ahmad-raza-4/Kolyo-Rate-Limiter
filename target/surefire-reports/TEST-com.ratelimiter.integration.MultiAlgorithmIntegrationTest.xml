@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="1.606" tests="5" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="1.017" tests="4" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -67,10 +67,12 @@
     <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} - %msg%n"/>
     <property name="LOGGED_APPLICATION_NAME" value="[rate-limiter] "/>
   </properties>
-  <testcase name="shouldNotAllowMoreTokensThanCapacity" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.007">
-    <system-out><![CDATA[2026-01-28 23:35:24 - Creating container for image: redis:7-alpine
-2026-01-28 23:35:24 - Container redis:7-alpine is starting: 4b30a5621c48b392ff1bbb0a66605d5e9c2ce743ebd4ea1a3abcb061c8e1bec6
-2026-01-28 23:35:25 - Container redis:7-alpine started in PT0.207899S
+  <testcase name="shouldWorkWithFixedWindowAlgorithm" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.214">
+    <system-out><![CDATA[2026-01-28 23:35:14 - Could not detect default configuration classes for test class [com.ratelimiter.integration.MultiAlgorithmIntegrationTest]: MultiAlgorithmIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-01-28 23:35:14 - Found @SpringBootConfiguration com.ratelimiter.RateLimiterApplication for test class com.ratelimiter.integration.MultiAlgorithmIntegrationTest
+2026-01-28 23:35:14 - Creating container for image: redis:7-alpine
+2026-01-28 23:35:14 - Container redis:7-alpine is starting: f546f1d4621a3f1cc595e71169b946733d5df175df0d98e805225b27b5a2da1b
+2026-01-28 23:35:14 - Container redis:7-alpine started in PT0.212913S
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -81,10 +83,16 @@
 
  :: Spring Boot ::                (v3.4.1)
 
+2026-01-28 23:35:14 - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-01-28 23:35:14 - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-01-28 23:35:14 - Finished Spring Data repository scanning in 2 ms. Found 0 Redis repository interfaces.
+2026-01-28 23:35:14 - Initializing Spring TestDispatcherServlet ''
+2026-01-28 23:35:14 - Initializing Servlet ''
+2026-01-28 23:35:14 - Exposing 3 endpoints beneath base path '/actuator'
+2026-01-28 23:35:14 - Completed initialization in 4 ms
 ]]></system-out>
   </testcase>
-  <testcase name="shouldAllowRequestWithinLimit" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.002"/>
-  <testcase name="shouldDenyRequestExceedingLimit" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.008"/>
-  <testcase name="shouldHandleMultipleTokenRequests" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.002"/>
-  <testcase name="shouldRefillTokensOverTime" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="1.115"/>
+  <testcase name="shouldWorkWithSlidingWindowAlgorithm" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.033"/>
+  <testcase name="shouldSwitchBetweenAlgorithms" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.024"/>
+  <testcase name="shouldWorkWithTokenBucketAlgorithm" classname="com.ratelimiter.integration.MultiAlgorithmIntegrationTest" time="0.036"/>
 </testsuite>

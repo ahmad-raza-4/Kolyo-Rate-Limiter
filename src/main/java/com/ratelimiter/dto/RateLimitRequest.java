@@ -16,6 +16,7 @@ public class RateLimitRequest {
     private String key;
     
     @Min(value = 1, message = "Tokens must be at least 1")
+    @Builder.Default
     private int tokens = 1;
     
     // Optional metadata

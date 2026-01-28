@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="1.606" tests="5" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.ratelimiter.config.RedisConfigTest" time="33.801" tests="1" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -67,10 +67,32 @@
     <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} - %msg%n"/>
     <property name="LOGGED_APPLICATION_NAME" value="[rate-limiter] "/>
   </properties>
-  <testcase name="shouldNotAllowMoreTokensThanCapacity" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.007">
-    <system-out><![CDATA[2026-01-28 23:35:24 - Creating container for image: redis:7-alpine
-2026-01-28 23:35:24 - Container redis:7-alpine is starting: 4b30a5621c48b392ff1bbb0a66605d5e9c2ce743ebd4ea1a3abcb061c8e1bec6
-2026-01-28 23:35:25 - Container redis:7-alpine started in PT0.207899S
+  <testcase name="shouldConnectToRedis" classname="com.ratelimiter.config.RedisConfigTest" time="0.7">
+    <system-out><![CDATA[23:34:40.527 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.ratelimiter.config.RedisConfigTest]: RedisConfigTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+23:34:40.604 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.ratelimiter.RateLimiterApplication for test class com.ratelimiter.config.RedisConfigTest
+23:34:40.675 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+23:34:40.676 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+23:34:40.698 [main] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.20.4
+23:34:40.832 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+23:34:40.994 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+23:34:40.994 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+23:34:41.009 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 28.5.1
+  API Version: 1.51
+  Operating System: Docker Desktop
+  Total Memory: 7837 MB
+  Labels: 
+    com.docker.desktop.address=unix:///Users/ahmadraza/Library/Containers/com.docker.docker/Data/docker-cli.sock
+23:34:41.063 [main] INFO tc.testcontainers/ryuk:0.11.0 -- Creating container for image: testcontainers/ryuk:0.11.0
+23:35:11.135 [main] INFO org.testcontainers.utility.RegistryAuthLocator -- Failure when attempting to lookup auth config. Please ignore if you don't have images in an authenticated registry. Details: (dockerImageName: testcontainers/ryuk:0.11.0, configFile: /Users/ahmadraza/.docker/config.json, configEnv: DOCKER_AUTH_CONFIG). Falling back to docker-java default behaviour. Exception message: Timed out waiting for Process[pid=23671, exitValue="not exited"] to finish, timeout: 30 seconds, executed command [docker-credential-desktop, get]
+23:35:11.227 [main] INFO tc.testcontainers/ryuk:0.11.0 -- Container testcontainers/ryuk:0.11.0 is starting: 183615a04047f66c5f884cb71a033af420474c26789970e576458585dc49e761
+23:35:11.435 [main] INFO tc.testcontainers/ryuk:0.11.0 -- Container testcontainers/ryuk:0.11.0 started in PT30.372024S
+23:35:11.440 [main] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+23:35:11.440 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+23:35:11.440 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+23:35:11.440 [main] INFO tc.redis:7-alpine -- Creating container for image: redis:7-alpine
+23:35:11.478 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine is starting: 8eeb1bbf5ae595e80ee0522ca377c2bd57f6577c7f8e1fd5dcf3d414f114d04b
+23:35:11.662 [main] INFO tc.redis:7-alpine -- Container redis:7-alpine started in PT0.221232S
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -81,10 +103,16 @@
 
  :: Spring Boot ::                (v3.4.1)
 
+2026-01-28 23:35:12 - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-01-28 23:35:12 - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-01-28 23:35:12 - Finished Spring Data repository scanning in 15 ms. Found 0 Redis repository interfaces.
+2026-01-28 23:35:13 - Exposing 3 endpoints beneath base path '/actuator'
 ]]></system-out>
+    <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build what is described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/Users/ahmadraza/.m2/repository/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
   </testcase>
-  <testcase name="shouldAllowRequestWithinLimit" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.002"/>
-  <testcase name="shouldDenyRequestExceedingLimit" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.008"/>
-  <testcase name="shouldHandleMultipleTokenRequests" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="0.002"/>
-  <testcase name="shouldRefillTokensOverTime" classname="com.ratelimiter.algorithm.TokenBucketAlgorithmTest" time="1.115"/>
 </testsuite>
