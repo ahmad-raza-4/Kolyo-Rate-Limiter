@@ -82,10 +82,15 @@ public class LeakyBucketAlgorithm implements RateLimitAlgorithm {
                 }
                 
             } else {
+                long retryAfterSeconds = (long) Math.ceil(waitTimeSeconds);
+                if (retryAfterSeconds <= 0 || Double.isNaN(waitTimeSeconds) || Double.isInfinite(waitTimeSeconds)) {
+                    retryAfterSeconds = 1;
+                }
+
                 response = RateLimitResponse.denied(
                     config.getCapacity() - queueSize,
                     resetTime,
-                    (long) Math.ceil(waitTimeSeconds),
+                    retryAfterSeconds,
                     getAlgorithmType().name()
                 );
             }

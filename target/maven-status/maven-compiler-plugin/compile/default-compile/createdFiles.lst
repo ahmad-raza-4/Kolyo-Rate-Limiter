@@ -18,6 +18,7 @@ com/ratelimiter/RateLimiterApplication.class
 com/ratelimiter/service/BenchmarkService$BenchmarkResult.class
 com/ratelimiter/algorithm/AlgorithmFactory.class
 com/ratelimiter/algorithm/SlidingWindowAlgorithm.class
+com/ratelimiter/algorithm/LeakyBucketAlgorithm.class
 com/ratelimiter/service/BenchmarkService.class
 com/ratelimiter/service/BenchmarkService$BenchmarkRequest.class
 com/ratelimiter/algorithm/TokenBucketAlgorithm.class
