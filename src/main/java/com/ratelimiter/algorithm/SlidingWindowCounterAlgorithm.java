@@ -54,7 +54,8 @@ public class SlidingWindowCounterAlgorithm implements RateLimitAlgorithm {
                     Arrays.asList(currentKey, previousKey),
                     config.getCapacity(),
                     windowSize,
-                    nowSeconds);
+                    nowSeconds,
+                    requestedTokens);
 
             if (result == null || result.size() < 3) {
                 throw new IllegalStateException("Invalid response from Redis Lua script");
@@ -93,9 +94,9 @@ public class SlidingWindowCounterAlgorithm implements RateLimitAlgorithm {
                     .build());
 
             log.debug("Sliding Window Counter check for key={}: allowed={}, " +
-                    "weighted_count={}, current_count={}, latency={}μs",
+                    "weighted_count={}, current_count={}, tokens={}, latency={}μs",
                     key, allowed == 1, String.format("%.2f", weightedCount),
-                    currentCount, latencyMicros);
+                    currentCount, requestedTokens, latencyMicros);
 
             return response;
 
