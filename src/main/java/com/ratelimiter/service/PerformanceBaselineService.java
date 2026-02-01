@@ -32,7 +32,7 @@ public class PerformanceBaselineService {
         try {
             String key = PREFIX + testName;
             redisTemplate.opsForList().leftPush(key, mapper.writeValueAsString(result));
-            redisTemplate.ltrim(key, 0, MAX_HISTORY - 1);
+            redisTemplate.opsForList().trim(key, 0, MAX_HISTORY - 1);
             redisTemplate.expire(key, 30, TimeUnit.DAYS);
         } catch (Exception e) {
             log.error("Failed to store baseline: {}", testName, e);

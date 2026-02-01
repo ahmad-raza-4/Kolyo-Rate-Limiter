@@ -29,24 +29,23 @@ public class RateLimitService {
     public RateLimitResponse checkLimit(RateLimitRequest request) {
         // record start time for latency calculation
         long startTime = System.nanoTime();
-        
+
         try {
             // retrieve configuration for the key
             RateLimitConfig config = configService.getConfig(request.getKey());
-            
+
             // get the appropriate algorithm implementation
             RateLimitAlgorithm algorithm = algorithmFactory.getAlgorithm(config.getAlgorithm());
-            
+
             // execute the rate limit check
             RateLimitResponse response = algorithm.checkLimit(
-                request.getKey(),
-                request.getTokens(),
-                config
-            );
+                    request.getKey(),
+                    request.getTokens(),
+                    config);
 
             // record metrics for the check
             long latencyMicros = (System.nanoTime() - startTime) / 1000;
-            metricsService.recordCheck(response, latencyMicros);
+            metricsService.recordCheck(response, latencyMicros, config.getAlgorithm().name());
 
             return response;
 
@@ -57,16 +56,16 @@ public class RateLimitService {
             if (failOpen) {
                 // fail open: allow request on error
                 return RateLimitResponse.builder()
-                    .allowed(true)
-                    .remainingTokens(-1)
-                    .build();
+                        .allowed(true)
+                        .remainingTokens(-1)
+                        .build();
             }
             // fail closed: ask client to retry later to avoid overload
             return RateLimitResponse.builder()
-                .allowed(false)
-                .remainingTokens(0)
-                .retryAfterSeconds(60L)
-                .build();
+                    .allowed(false)
+                    .remainingTokens(0)
+                    .retryAfterSeconds(60L)
+                    .build();
         }
     }
 
