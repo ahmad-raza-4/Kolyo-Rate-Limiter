@@ -2,6 +2,7 @@ package com.ratelimiter.service;
 
 import com.ratelimiter.dto.RateLimitResponse;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +47,7 @@ public class MetricsService {
         } else {
             deniedCounter.increment();
         }
-        
+
         checkLatencyTimer.record(latencyMicros, TimeUnit.MICROSECONDS);
     }
 

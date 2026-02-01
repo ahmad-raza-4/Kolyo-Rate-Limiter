@@ -20,11 +20,12 @@ import java.util.UUID;
 /**
  * Sliding Window rate limiting algorithm using Redis and a Lua script.
  *
- * <p>Characteristics:
+ * <p>
+ * Characteristics:
  * <ul>
- *   <li>Accurate rolling window using a sorted set.</li>
- *   <li>Higher memory usage than fixed window due to per-request entries.</li>
- *   <li>More precise smoothing at the cost of extra Redis work.</li>
+ * <li>Accurate rolling window using a sorted set.</li>
+ * <li>Higher memory usage than fixed window due to per-request entries.</li>
+ * <li>More precise smoothing at the cost of extra Redis work.</li>
  * </ul>
  */
 @Slf4j
@@ -44,13 +45,12 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
         ClassPathResource resource = new ClassPathResource("lua/sliding_window.lua");
         // read script content as string
         String scriptContent = new String(
-            resource.getInputStream().readAllBytes(),
-            StandardCharsets.UTF_8
-        );
+                resource.getInputStream().readAllBytes(),
+                StandardCharsets.UTF_8);
         // compile script for redis execution
         @SuppressWarnings("unchecked")
-        RedisScript<List<Object>> script = (RedisScript<List<Object>>) (RedisScript<?>)
-            RedisScript.of(scriptContent, List.class);
+        RedisScript<List<Object>> script = (RedisScript<List<Object>>) (RedisScript<?>) RedisScript.of(scriptContent,
+                List.class);
         this.slidingWindowScript = script;
         log.info("Sliding Window Lua script loaded successfully");
     }
@@ -60,14 +60,8 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
     public RateLimitResponse checkLimit(String key, int requestedTokens, RateLimitConfig config) {
         // record start time for latency calculation
         long startTime = System.nanoTime();
-        
-        try {
-            // sliding window doesn't support multi-token requests efficiently
-            if (requestedTokens > 1) {
-                log.warn("sliding window algorithm doesn't support multi-token requests efficiently. " +
-                        "processing as {} individual requests for key: {}", requestedTokens, key);
-            }
 
+        try {
             // construct redis key for the sliding window
             String windowKey = "ratelimit:sliding:" + key;
             // get current timestamp in milliseconds
@@ -76,16 +70,18 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
             long windowSizeMillis = config.getRefillPeriodSeconds() * 1000L;
             // generate unique request id
             String requestId = UUID.randomUUID().toString();
-            
-            // execute script with parameters: capacity, window size, current time, request id, ttl
+
+            // execute script with parameters: capacity, window size, current time, request
+            // id, ttl, requested tokens
             List<Object> result = redisTemplate.execute(
-                slidingWindowScript,
-                Collections.singletonList(windowKey),
-                config.getCapacity(),  // max requests in window
-                windowSizeMillis,
-                nowMillis,
-                requestId,
-                config.getRefillPeriodSeconds() + 60  // ttl slightly longer than window
+                    slidingWindowScript,
+                    Collections.singletonList(windowKey),
+                    config.getCapacity(), // max requests in window
+                    windowSizeMillis,
+                    nowMillis,
+                    requestId,
+                    config.getRefillPeriodSeconds() + 60, // ttl slightly longer than window
+                    requestedTokens // number of tokens to consume
             );
 
             // validate script response
@@ -100,7 +96,7 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
 
             // calculate latency in microseconds
             long latencyMicros = (System.nanoTime() - startTime) / 1000;
-            
+
             RateLimitResponse response;
             // calculate reset time based on oldest request in window
             long resetAtMs;
@@ -111,22 +107,20 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
             }
             Instant resetTime = Instant.ofEpochMilli(resetAtMs);
             long retryAfterSeconds = Math.max(0L, (resetAtMs - nowMillis) / 1000L);
-            
+
             // create allowed response
             if (allowed == 1) {
                 response = RateLimitResponse.allowed(
-                    remaining,
-                    resetTime,
-                    getAlgorithmType().name()
-                );
+                        remaining,
+                        resetTime,
+                        getAlgorithmType().name());
             } else {
                 // create denied response with window size as retry-after
                 response = RateLimitResponse.denied(
-                    0,
-                    resetTime,
-                    retryAfterSeconds,
-                    getAlgorithmType().name()
-                );
+                        0,
+                        resetTime,
+                        retryAfterSeconds,
+                        getAlgorithmType().name());
             }
 
             // add metadata with key and latency
@@ -135,8 +129,8 @@ public class SlidingWindowAlgorithm implements RateLimitAlgorithm {
                     .latencyMicros(latencyMicros)
                     .build());
 
-                log.debug("Sliding Window check for key={}: allowed={}, remaining={}, latency={}μs",
-                    key, allowed == 1, remaining, latencyMicros);
+            log.debug("Sliding Window check for key={}: allowed={}, remaining={}, tokens={}, latency={}μs",
+                    key, allowed == 1, remaining, requestedTokens, latencyMicros);
 
             return response;
 

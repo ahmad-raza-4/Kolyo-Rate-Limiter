@@ -10,6 +10,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
@@ -46,12 +47,7 @@ public class RedisConfig {
             redisConfig.setPassword(redisPassword);
         }
 
-        ClientOptions clientOptions = ClientOptions.builder()
-                .autoReconnect(true)
-                .build();
-
         LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
-                .clientOptions(clientOptions)
                 .clientResources(clientResources)
                 .commandTimeout(timeout)
                 .build();
