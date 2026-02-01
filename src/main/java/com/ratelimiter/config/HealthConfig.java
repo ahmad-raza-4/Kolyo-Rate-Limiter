@@ -22,8 +22,9 @@ public class HealthConfig {
         return () -> {
             try {
                 long t0 = System.currentTimeMillis();
-                redisTemplate.getConnectionFactory()
-                        .getConnection().ping();
+                try (var connection = redisTemplate.getConnectionFactory().getConnection()) {
+                    connection.ping();
+                }
                 long latencyMs = System.currentTimeMillis() - t0;
 
                 Set<String> keys = redisTemplate.keys("ratelimit:*");
