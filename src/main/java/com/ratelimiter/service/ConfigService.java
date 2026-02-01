@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,9 +33,26 @@ public class ConfigService {
     @Value("${ratelimiter.default.refill-period-seconds}")
     private Integer defaultRefillPeriod;
 
-    // In-memory cache for performance
+    // Simple in-memory cache for performance
     private final Map<String, RateLimitConfig> configCache = new ConcurrentHashMap<>();
     private final Map<String, PatternMatcher.CompiledPattern> patternCache = new ConcurrentHashMap<>();
+
+    /**
+     * Load all patterns from Redis on startup to avoid repeated Redis calls.
+     * This eliminates the expensive getAllPatterns() call in findMatchingPattern().
+     */
+    @PostConstruct
+    public void init() {
+        log.info("Loading pattern configurations from Redis...");
+        List<RateLimitConfig> patterns = getAllPatterns();
+        for (RateLimitConfig config : patterns) {
+            PatternMatcher.CompiledPattern compiled = patternMatcher.compile(
+                    config.getKeyPattern(),
+                    config.getPriority());
+            patternCache.put(config.getKeyPattern(), compiled);
+        }
+        log.info("Loaded {} pattern configurations into cache", patterns.size());
+    }
 
     public RateLimitConfig getConfig(String key) {
         // Check cache first
@@ -156,15 +174,12 @@ public class ConfigService {
     }
 
     private RateLimitConfig findMatchingPattern(String key) {
+        // Use in-memory pattern cache (loaded at startup)
         List<PatternMatcher.CompiledPattern> patterns = new ArrayList<>(patternCache.values());
 
         if (patterns.isEmpty()) {
-            // Load patterns from Redis
-            patterns = getAllPatterns().stream()
-                    .map(config -> patternMatcher.compile(
-                            config.getKeyPattern(),
-                            config.getPriority()))
-                    .toList();
+            log.warn("No patterns loaded in cache - this shouldn't happen after init()");
+            return null;
         }
 
         PatternMatcher.CompiledPattern bestMatch = patternMatcher.findBestMatch(key, patterns);
@@ -195,12 +210,14 @@ public class ConfigService {
     }
 
     private RateLimitConfig getConfigFromRedis(String redisKey) {
-        if (!Boolean.TRUE.equals(redisTemplate.hasKey(redisKey))) {
-            return null;
-        }
-
         try {
+            // Directly fetch hash - if key doesn't exist, entries() returns empty map
+            // This saves 1 Redis round trip vs checking hasKey() first
             Map<Object, Object> hash = redisTemplate.opsForHash().entries(redisKey);
+
+            if (hash.isEmpty()) {
+                return null;
+            }
 
             String algorithmStr = (String) hash.get("algorithm");
             Integer capacity = (Integer) hash.get("capacity");

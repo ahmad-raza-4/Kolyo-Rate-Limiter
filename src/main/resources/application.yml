@@ -38,6 +38,10 @@ ratelimiter:
     key-prefix: "ratelimit"
     config-prefix: "config"
     ttl-seconds: 3600
+  cache:
+    config-ttl-seconds: 60     # Cache config for 60 seconds
+    max-size: 10000             # Maximum cache entries
+    enable-stats: true          # Enable cache statistics
   performance:
     metrics-enabled: true
     detailed-logging: false
