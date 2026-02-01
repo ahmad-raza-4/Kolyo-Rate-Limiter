@@ -33,3 +33,5 @@ impl_plan.md
 plan.md
 
 target/
+
+.local-m2/

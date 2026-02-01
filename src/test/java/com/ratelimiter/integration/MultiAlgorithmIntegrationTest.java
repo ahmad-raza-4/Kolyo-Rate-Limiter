@@ -24,191 +24,186 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers
 class MultiAlgorithmIntegrationTest {
 
-    @Container
-    private static final GenericContainer<?> redis = 
-        new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+        @Container
+        private static final GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
+                        .withExposedPorts(6379);
 
-    @DynamicPropertySource
-    static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
-    }
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Test
-    void shouldWorkWithTokenBucketAlgorithm() throws Exception {
-        String key = "test:token:bucket:1";
-        
-        // Configure Token Bucket
-        RateLimitConfig config = RateLimitConfig.builder()
-                .algorithm(RateLimitAlgorithm.TOKEN_BUCKET)
-                .capacity(5)
-                .refillRate(5.0)
-                .refillPeriodSeconds(60)
-                .build();
-
-        mockMvc.perform(post("/api/ratelimit/config")
-                .param("key", key)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(config)))
-                .andExpect(status().isCreated());
-
-        // Test rate limiting
-        RateLimitRequest request = RateLimitRequest.builder()
-                .key(key)
-                .tokens(1)
-                .build();
-
-        // Should allow 5 requests
-        for (int i = 0; i < 5; i++) {
-            mockMvc.perform(post("/api/ratelimit/check")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.allowed").value(true))
-                    .andExpect(jsonPath("$.algorithm").value("TOKEN_BUCKET"));
+        @DynamicPropertySource
+        static void redisProperties(DynamicPropertyRegistry registry) {
+                registry.add("spring.data.redis.host", redis::getHost);
+                registry.add("spring.data.redis.port", redis::getFirstMappedPort);
         }
 
-        // 6th request should be denied
-        mockMvc.perform(post("/api/ratelimit/check")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.allowed").value(false));
-    }
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Test
-    void shouldWorkWithSlidingWindowAlgorithm() throws Exception {
-        String key = "test:sliding:window:1";
-        
-        // Configure Sliding Window
-        RateLimitConfig config = RateLimitConfig.builder()
-                .algorithm(RateLimitAlgorithm.SLIDING_WINDOW)
-                .capacity(3)
-                .refillRate(3.0)
-                .refillPeriodSeconds(5)
-                .build();
+        @Autowired
+        private ObjectMapper objectMapper;
 
-        mockMvc.perform(post("/api/ratelimit/config")
-                .param("key", key)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(config)))
-                .andExpect(status().isCreated());
+        @Test
+        void shouldWorkWithTokenBucketAlgorithm() throws Exception {
+                String key = "test:token:bucket:1";
 
-        RateLimitRequest request = RateLimitRequest.builder()
-                .key(key)
-                .tokens(1)
-                .build();
+                // Configure Token Bucket
+                RateLimitConfig config = RateLimitConfig.builder()
+                                .algorithm(RateLimitAlgorithm.TOKEN_BUCKET)
+                                .capacity(5)
+                                .refillRate(5.0)
+                                .refillPeriodSeconds(60)
+                                .build();
 
-        // Should allow 3 requests
-        for (int i = 0; i < 3; i++) {
-            mockMvc.perform(post("/api/ratelimit/check")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.algorithm").value("SLIDING_WINDOW"));
+                mockMvc.perform(post("/api/ratelimit/config/keys/" + key)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(config)))
+                                .andExpect(status().isCreated());
+
+                // Test rate limiting
+                RateLimitRequest request = RateLimitRequest.builder()
+                                .key(key)
+                                .tokens(1)
+                                .build();
+
+                // Should allow 5 requests
+                for (int i = 0; i < 5; i++) {
+                        mockMvc.perform(post("/api/ratelimit/check")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.allowed").value(true))
+                                        .andExpect(jsonPath("$.algorithm").value("TOKEN_BUCKET"));
+                }
+
+                // 6th request should be denied
+                mockMvc.perform(post("/api/ratelimit/check")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isTooManyRequests())
+                                .andExpect(jsonPath("$.allowed").value(false));
         }
 
-        // 4th request should be denied
-        mockMvc.perform(post("/api/ratelimit/check")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isTooManyRequests());
-    }
+        @Test
+        void shouldWorkWithSlidingWindowAlgorithm() throws Exception {
+                String key = "test:sliding:window:1";
 
-    @Test
-    void shouldWorkWithFixedWindowAlgorithm() throws Exception {
-        String key = "test:fixed:window:1";
-        
-        // Configure Fixed Window
-        RateLimitConfig config = RateLimitConfig.builder()
-                .algorithm(RateLimitAlgorithm.FIXED_WINDOW)
-                .capacity(4)
-                .refillRate(4.0)
-                .refillPeriodSeconds(10)
-                .build();
+                // Configure Sliding Window
+                RateLimitConfig config = RateLimitConfig.builder()
+                                .algorithm(RateLimitAlgorithm.SLIDING_WINDOW)
+                                .capacity(3)
+                                .refillRate(3.0)
+                                .refillPeriodSeconds(5)
+                                .build();
 
-        mockMvc.perform(post("/api/ratelimit/config")
-                .param("key", key)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(config)))
-                .andExpect(status().isCreated());
+                mockMvc.perform(post("/api/ratelimit/config/keys/" + key)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(config)))
+                                .andExpect(status().isCreated());
 
-        RateLimitRequest request = RateLimitRequest.builder()
-                .key(key)
-                .tokens(1)
-                .build();
+                RateLimitRequest request = RateLimitRequest.builder()
+                                .key(key)
+                                .tokens(1)
+                                .build();
 
-        // Should allow 4 requests
-        for (int i = 0; i < 4; i++) {
-            mockMvc.perform(post("/api/ratelimit/check")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.algorithm").value("FIXED_WINDOW"));
+                // Should allow 3 requests
+                for (int i = 0; i < 3; i++) {
+                        mockMvc.perform(post("/api/ratelimit/check")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.algorithm").value("SLIDING_WINDOW"));
+                }
+
+                // 4th request should be denied
+                mockMvc.perform(post("/api/ratelimit/check")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isTooManyRequests());
         }
 
-        // 5th request should be denied
-        mockMvc.perform(post("/api/ratelimit/check")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isTooManyRequests());
-    }
+        @Test
+        void shouldWorkWithFixedWindowAlgorithm() throws Exception {
+                String key = "test:fixed:window:1";
 
-    @Test
-    void shouldSwitchBetweenAlgorithms() throws Exception {
-        String key = "test:switch:algorithms";
-        
-        // Start with Token Bucket
-        RateLimitConfig tokenBucket = RateLimitConfig.builder()
-                .algorithm(RateLimitAlgorithm.TOKEN_BUCKET)
-                .capacity(10)
-                .refillRate(10.0)
-                .refillPeriodSeconds(60)
-                .build();
+                // Configure Fixed Window
+                RateLimitConfig config = RateLimitConfig.builder()
+                                .algorithm(RateLimitAlgorithm.FIXED_WINDOW)
+                                .capacity(4)
+                                .refillRate(4.0)
+                                .refillPeriodSeconds(10)
+                                .build();
 
-        mockMvc.perform(post("/api/ratelimit/config")
-                .param("key", key)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(tokenBucket)))
-                .andExpect(status().isCreated());
+                mockMvc.perform(post("/api/ratelimit/config/keys/" + key)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(config)))
+                                .andExpect(status().isCreated());
 
-        RateLimitRequest request = RateLimitRequest.builder()
-                .key(key)
-                .tokens(1)
-                .build();
+                RateLimitRequest request = RateLimitRequest.builder()
+                                .key(key)
+                                .tokens(1)
+                                .build();
 
-        // Make request with Token Bucket
-        mockMvc.perform(post("/api/ratelimit/check")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.algorithm").value("TOKEN_BUCKET"));
+                // Should allow 4 requests
+                for (int i = 0; i < 4; i++) {
+                        mockMvc.perform(post("/api/ratelimit/check")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.algorithm").value("FIXED_WINDOW"));
+                }
 
-        // Switch to Sliding Window
-        RateLimitConfig slidingWindow = RateLimitConfig.builder()
-                .algorithm(RateLimitAlgorithm.SLIDING_WINDOW)
-                .capacity(5)
-                .refillRate(5.0)
-                .refillPeriodSeconds(30)
-                .build();
+                // 5th request should be denied
+                mockMvc.perform(post("/api/ratelimit/check")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isTooManyRequests());
+        }
 
-        mockMvc.perform(post("/api/ratelimit/config")
-                .param("key", key)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(slidingWindow)))
-                .andExpect(status().isCreated());
+        @Test
+        void shouldSwitchBetweenAlgorithms() throws Exception {
+                String key = "test:switch:algorithms";
 
-        // Make request with Sliding Window
-        mockMvc.perform(post("/api/ratelimit/check")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.algorithm").value("SLIDING_WINDOW"));
-    }
+                // Start with Token Bucket
+                RateLimitConfig tokenBucket = RateLimitConfig.builder()
+                                .algorithm(RateLimitAlgorithm.TOKEN_BUCKET)
+                                .capacity(10)
+                                .refillRate(10.0)
+                                .refillPeriodSeconds(60)
+                                .build();
+
+                mockMvc.perform(post("/api/ratelimit/config/keys/" + key)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(tokenBucket)))
+                                .andExpect(status().isCreated());
+
+                RateLimitRequest request = RateLimitRequest.builder()
+                                .key(key)
+                                .tokens(1)
+                                .build();
+
+                // Make request with Token Bucket
+                mockMvc.perform(post("/api/ratelimit/check")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.algorithm").value("TOKEN_BUCKET"));
+
+                // Switch to Sliding Window
+                RateLimitConfig slidingWindow = RateLimitConfig.builder()
+                                .algorithm(RateLimitAlgorithm.SLIDING_WINDOW)
+                                .capacity(5)
+                                .refillRate(5.0)
+                                .refillPeriodSeconds(30)
+                                .build();
+
+                mockMvc.perform(post("/api/ratelimit/config/keys/" + key)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(slidingWindow)))
+                                .andExpect(status().isCreated());
+
+                // Make request with Sliding Window
+                mockMvc.perform(post("/api/ratelimit/check")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.algorithm").value("SLIDING_WINDOW"));
+        }
 }

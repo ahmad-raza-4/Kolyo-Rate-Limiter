@@ -126,8 +126,8 @@ class SlidingWindowCounterAlgorithmTest {
         }
 
         // Wait for window transition
-        log.info("Waiting for window transition (2100ms)...");
-        Thread.sleep(2100);
+        log.info("Waiting for window transition (2700ms)...");
+        Thread.sleep(2700);
 
         // Should be able to make requests in new window
         RateLimitResponse response = slidingWindowCounterAlgorithm.checkLimit(key, 1, config);
