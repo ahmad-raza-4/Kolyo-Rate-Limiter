@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -109,25 +110,21 @@ class PerformanceControllerTest {
     }
 
     @Test
-    void shouldHandleInvalidRequest() throws Exception {
+    void shouldHandleInvalidRequest() {
         // Given - invalid request with missing required fields
         String invalidRequest = "{}";
 
-        // When/Then - Spring will throw an error due to null algorithm
-        // The controller doesn't have validation, so it throws NPE
-        try {
+        // When/Then - Controller doesn't have validation, so it throws NPE
+        // This documents current behavior; ideally controller should have @Valid
+        assertThrows(Exception.class, () -> 
             mockMvc.perform(post("/api/performance/run-and-analyze")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(invalidRequest));
-        } catch (Exception e) {
-            // Expected - NPE due to null algorithm field
-            assertTrue(e.getMessage().contains("NullPointerException") || 
-                      e.getCause() instanceof NullPointerException);
-        }
+                    .content(invalidRequest))
+        );
     }
 
     @Test
-    void shouldHandleBenchmarkServiceException() throws Exception {
+    void shouldHandleBenchmarkServiceException() {
         // Given
         BenchmarkRequest request = BenchmarkRequest.builder()
                 .algorithm(com.ratelimiter.model.RateLimitAlgorithm.TOKEN_BUCKET)
@@ -142,16 +139,13 @@ class PerformanceControllerTest {
         when(benchmarkService.runBenchmark(any(BenchmarkRequest.class)))
                 .thenThrow(new RuntimeException("Benchmark failed"));
 
-        // When/Then - Exception gets wrapped in ServletException
-        try {
+        // When/Then - Controller doesn't have exception handler, so exception propagates
+        // This documents current behavior; ideally should have @ExceptionHandler
+        assertThrows(Exception.class, () -> 
             mockMvc.perform(post("/api/performance/run-and-analyze")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().is5xxServerError());
-        } catch (Exception e) {
-            // Expected - the controller doesn't have global exception handling
-            assertTrue(e.getCause() instanceof RuntimeException);
-        }
+        );
     }
 
     @Test
