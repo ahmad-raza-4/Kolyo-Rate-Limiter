@@ -222,8 +222,10 @@ class ConfigCacheManagerTest {
 
         // Then
         assertThat(result).isNull();
-        // Note: Caffeine caches null values from loaders (size=1), but put(key, null) 
-        // is explicitly prevented by ConfigCacheManager and doesn't cache (size=0)
+        // Note: Different null handling behavior is intentional:
+        // - put(key, null) explicitly filters nulls (see line 78 in ConfigCacheManager) - size=0
+        // - get(key, k -> null) delegates to Caffeine which caches loader-returned nulls - size=1
+        // This prevents accidental null storage via put() while allowing cache miss indicators from loaders
         assertThat(cacheManager.size()).isEqualTo(1);
     }
 

@@ -242,7 +242,8 @@ public class ConfigService {
                 priority = priorityObj != null ? (Integer) priorityObj : 0;
             }
 
-            // Extract keyPattern from hash or derive from Redis key
+            // Extract keyPattern from hash or derive from Redis key (optional field)
+            // The keyPattern can be null if not stored in hash, in which case it's derived from redisKey
             String keyPattern = (String) hash.get("keyPattern");
             if (keyPattern == null) {
                 // Fallback: extract from Redis key (e.g., "config:pattern:api:*" -> "api:*")
