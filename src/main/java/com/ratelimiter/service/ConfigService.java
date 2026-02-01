@@ -183,6 +183,10 @@ public class ConfigService {
         redisTemplate.opsForHash().put(redisKey, "refillRate", config.getRefillRate());
         redisTemplate.opsForHash().put(redisKey, "refillPeriodSeconds", config.getRefillPeriodSeconds());
 
+        if (config.getKeyPattern() != null) {
+            redisTemplate.opsForHash().put(redisKey, "keyPattern", config.getKeyPattern());
+        }
+
         if (config.getPriority() != null) {
             redisTemplate.opsForHash().put(redisKey, "priority", config.getPriority());
         }
@@ -204,7 +208,19 @@ public class ConfigService {
             Integer refillPeriod = (Integer) hash.get("refillPeriodSeconds");
             Integer priority = hash.containsKey("priority") ? (Integer) hash.get("priority") : 0;
 
+            // Extract keyPattern from hash or derive from Redis key
+            String keyPattern = (String) hash.get("keyPattern");
+            if (keyPattern == null) {
+                // Fallback: extract from Redis key (e.g., "config:pattern:api:*" -> "api:*")
+                if (redisKey.startsWith("config:pattern:")) {
+                    keyPattern = redisKey.substring("config:pattern:".length());
+                } else if (redisKey.startsWith("config:key:")) {
+                    keyPattern = redisKey.substring("config:key:".length());
+                }
+            }
+
             return RateLimitConfig.builder()
+                    .keyPattern(keyPattern)
                     .algorithm(RateLimitAlgorithm.valueOf(algorithmStr))
                     .capacity(capacity)
                     .refillRate(refillRate)

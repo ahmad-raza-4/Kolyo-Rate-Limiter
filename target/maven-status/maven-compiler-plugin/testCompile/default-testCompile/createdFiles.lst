@@ -5,6 +5,8 @@ com/ratelimiter/config/HealthConfig.class
 com/ratelimiter/algorithm/SlidingWindowCounterAlgorithmTest.class
 com/ratelimiter/integration/MultiAlgorithmIntegrationTest.class
 com/ratelimiter/integration/RateLimitIntegrationTest.class
+com/ratelimiter/integration/PatternConfigIntegrationTest.class
 com/ratelimiter/RateLimiterApplicationTests.class
+com/ratelimiter/service/PatternMatcherTest.class
 com/ratelimiter/algorithm/SlidingWindowAlgorithmTest.class
 com/ratelimiter/algorithm/TokenBucketAlgorithmTest.class

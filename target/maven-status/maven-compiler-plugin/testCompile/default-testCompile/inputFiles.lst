@@ -7,4 +7,6 @@
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/config/HealthConfig.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/config/RedisConfigTest.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/integration/MultiAlgorithmIntegrationTest.java
+/Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/integration/PatternConfigIntegrationTest.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/integration/RateLimitIntegrationTest.java
+/Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/service/PatternMatcherTest.java
