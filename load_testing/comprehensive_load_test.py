@@ -1084,6 +1084,7 @@ def test_retry_after_headers(parsed, algo_config: AlgorithmConfig) -> EdgeCaseRe
                         if retry_after is not None and retry_after > 0:
                             retry_after_values.append(retry_after)
                     except json.JSONDecodeError:
+                        # Body is not valid JSON (e.g., HTML error page); ignore and fall back to headers.
                         pass
                 # Also check Retry-After header
                 retry_after_header = response_headers.get("Retry-After")
@@ -1091,6 +1092,7 @@ def test_retry_after_headers(parsed, algo_config: AlgorithmConfig) -> EdgeCaseRe
                     try:
                         retry_after_values.append(int(retry_after_header))
                     except ValueError:
+                        # Ignore invalid Retry-After header values; they are non-fatal for this validation.
                         pass
         except Exception as e:
             issues.append(f"Request {i} failed: {e}")

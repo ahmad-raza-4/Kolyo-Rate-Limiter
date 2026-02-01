@@ -2,6 +2,7 @@ package com.ratelimiter.service;
 
 import com.ratelimiter.dto.RateLimitResponse;
 import io.micrometer.core.instrument.*;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,12 @@ public class MetricsService {
 
     private final MeterRegistry registry;
     private final AtomicInteger activeKeys = new AtomicInteger(0);
+
+    @PostConstruct
+    public void init() {
+        // Register gauge once during initialization
+        registry.gauge("ratelimit.keys.active", activeKeys);
+    }
 
     // ─── Core check: tagged by algorithm + result ────────────────────
     public void recordCheck(RateLimitResponse response, long latencyMicros, String algorithm) {
@@ -75,6 +82,5 @@ public class MetricsService {
     // ─── Live gauge ───────────────────────────────────────────────────
     public void updateActiveKeys(int count) {
         activeKeys.set(count);
-        registry.gauge("ratelimit.keys.active", activeKeys);
     }
 }

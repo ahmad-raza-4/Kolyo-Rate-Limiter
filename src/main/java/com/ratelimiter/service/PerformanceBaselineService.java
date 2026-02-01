@@ -65,10 +65,32 @@ public class PerformanceBaselineService {
 
         BenchmarkResult prev = history.get(0);
 
-        double latDelta = (double) (latest.getLatency().getP95Micros()
-                - prev.getLatency().getP95Micros()) / prev.getLatency().getP95Micros();
-        double tpDelta = (prev.getThroughputRps() - latest.getThroughputRps())
-                / prev.getThroughputRps();
+        // Null safety and division by zero protection
+        Long latestP95 = null;
+        Long prevP95 = null;
+        if (latest != null && latest.getLatency() != null) {
+            latestP95 = latest.getLatency().getP95Micros();
+        }
+        if (prev != null && prev.getLatency() != null) {
+            prevP95 = prev.getLatency().getP95Micros();
+        }
+
+        double latDelta = 0.0;
+        if (latestP95 != null && prevP95 != null && prevP95 != 0L) {
+            latDelta = (double) (latestP95 - prevP95) / prevP95;
+        } else if (prevP95 == null || prevP95 <= 0) {
+            log.warn("Previous baseline P95 latency is null or non-positive for test '{}'; " +
+                    "cannot compute relative latency delta, treating as 0.", testName);
+        }
+
+        double tpDelta = 0.0;
+        if (prev.getThroughputRps() > 0 && latest.getThroughputRps() >= 0) {
+            tpDelta = (prev.getThroughputRps() - latest.getThroughputRps())
+                    / prev.getThroughputRps();
+        } else if (prev.getThroughputRps() <= 0) {
+            log.warn("Previous baseline throughput is non-positive for test '{}'; " +
+                    "cannot compute relative throughput delta, treating as 0.", testName);
+        }
 
         boolean latRegressed = latDelta > LATENCY_REGRESSION_PCT;
         boolean tpRegressed = tpDelta > THROUGHPUT_REGRESSION_PCT;
@@ -77,10 +99,10 @@ public class PerformanceBaselineService {
         if (latRegressed || tpRegressed) {
             status = "REGRESSION_DETECTED";
             List<String> issues = new ArrayList<>();
-            if (latRegressed)
+            if (latRegressed && latestP95 != null && prevP95 != null)
                 issues.add(String.format(
                         "P95 latency +%.1f%% (%dμs → %dμs)", latDelta * 100,
-                        prev.getLatency().getP95Micros(), latest.getLatency().getP95Micros()));
+                        prevP95, latestP95));
             if (tpRegressed)
                 issues.add(String.format(
                         "Throughput -%.1f%% (%.0f → %.0f RPS)", tpDelta * 100,

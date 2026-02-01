@@ -82,22 +82,22 @@ Error Rate: 0.00%
 
 ## Architecture
 
-```
+```text
+           +--------+        +----------------------+        +--------+
+           | Client | -----> |  Rate Limiter        | -----> | Redis  |
+           |        |        |  Service (stateless) |        | (state)|
+           +--------+        +----------------------+        +--------+
 
-Client Rate Redis 
-Limiter (State) 
-Service 
-
-
-
-
-Algorithm 
-- Token 
-- Sliding 
-- Fixed 
-- Leaky 
-- SWC 
-
+                                  |
+                                  v
+                        +--------------------------+
+                        | Algorithms               |
+                        | - Token Bucket           |
+                        | - Sliding Window         |
+                        | - Fixed Window           |
+                        | - Leaky Bucket           |
+                        | - SWC                    |
+                        +--------------------------+
 ```
 
 ### Request Flow
@@ -124,7 +124,7 @@ Algorithm
 
 - **Java 21+**
 - **Maven 3.9+**
-- **Redis 6.0+**(or Docker)
+- **Redis 6.0+** (or Docker)
 
 ### 1. Clone & Install
 
@@ -151,7 +151,7 @@ redis-server
 mvn spring-boot:run
 ```
 
-**Application starts on**`http://localhost:8080`
+**Application starts on** `http://localhost:8080`
 
 ### 4. Make Your First Request
 
@@ -647,13 +647,13 @@ kubectl apply -f k8s-deployment.yml
 
 For high-availability production deployments:
 
-- **Redis Cluster**- Horizontal scaling, automatic sharding
-- **Redis Sentinel**- Automatic failover, high availability
-- **Managed Redis**- AWS ElastiCache, Azure Cache for Redis, Google Memorystore
+- **Redis Cluster** - Horizontal scaling, automatic sharding
+- **Redis Sentinel** - Automatic failover, high availability
+- **Managed Redis** - AWS ElastiCache, Azure Cache for Redis, Google Memorystore
 
 #### Performance Tuning
 
-**Connection Pooling**(already configured):
+**Connection Pooling** (already configured):
 ```yaml
 spring:
 data:
