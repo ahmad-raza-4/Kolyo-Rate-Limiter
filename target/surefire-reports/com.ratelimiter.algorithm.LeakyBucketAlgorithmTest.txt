@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.ratelimiter.algorithm.LeakyBucketAlgorithmTest
--------------------------------------------------------------------------------
-Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.011 s -- in com.ratelimiter.algorithm.LeakyBucketAlgorithmTest

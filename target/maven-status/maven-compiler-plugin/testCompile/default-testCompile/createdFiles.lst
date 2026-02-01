@@ -2,6 +2,7 @@ com/ratelimiter/algorithm/LeakyBucketAlgorithmTest.class
 com/ratelimiter/algorithm/FixedWindowAlgorithmTest.class
 com/ratelimiter/config/RedisConfigTest.class
 com/ratelimiter/config/HealthConfig.class
+com/ratelimiter/algorithm/SlidingWindowCounterAlgorithmTest.class
 com/ratelimiter/integration/MultiAlgorithmIntegrationTest.class
 com/ratelimiter/integration/RateLimitIntegrationTest.class
 com/ratelimiter/RateLimiterApplicationTests.class

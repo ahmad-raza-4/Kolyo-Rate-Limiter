@@ -2,6 +2,7 @@
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/algorithm/FixedWindowAlgorithmTest.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/algorithm/LeakyBucketAlgorithmTest.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/algorithm/SlidingWindowAlgorithmTest.java
+/Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/algorithm/SlidingWindowCounterAlgorithmTest.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/algorithm/TokenBucketAlgorithmTest.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/config/HealthConfig.java
 /Users/ahmadraza/WorkDir/personal/rate_limiter/src/test/java/com/ratelimiter/config/RedisConfigTest.java
