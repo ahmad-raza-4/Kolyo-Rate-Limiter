@@ -68,17 +68,17 @@ public class PerformanceBaselineService {
         // Null safety and division by zero protection
         Long latestP95 = null;
         Long prevP95 = null;
-        if (latest != null && latest.getLatency() != null) {
+        if (latest.getLatency() != null) {
             latestP95 = latest.getLatency().getP95Micros();
         }
-        if (prev != null && prev.getLatency() != null) {
+        if (prev.getLatency() != null) {
             prevP95 = prev.getLatency().getP95Micros();
         }
 
         double latDelta = 0.0;
         if (latestP95 != null && prevP95 != null && prevP95 != 0L) {
             latDelta = (double) (latestP95 - prevP95) / prevP95;
-        } else if (prevP95 == null || prevP95 <= 0) {
+        } else {
             log.warn("Previous baseline P95 latency is null or non-positive for test '{}'; " +
                     "cannot compute relative latency delta, treating as 0.", testName);
         }
@@ -87,7 +87,7 @@ public class PerformanceBaselineService {
         if (prev.getThroughputRps() > 0 && latest.getThroughputRps() >= 0) {
             tpDelta = (prev.getThroughputRps() - latest.getThroughputRps())
                     / prev.getThroughputRps();
-        } else if (prev.getThroughputRps() <= 0) {
+        } else {
             log.warn("Previous baseline throughput is non-positive for test '{}'; " +
                     "cannot compute relative throughput delta, treating as 0.", testName);
         }
