@@ -222,7 +222,8 @@ class ConfigCacheManagerTest {
 
         // Then
         assertThat(result).isNull();
-        // Caffeine caches null values from loaders, so it should be in cache
+        // Note: Caffeine caches null values from loaders (size=1), but put(key, null) 
+        // is explicitly prevented by ConfigCacheManager and doesn't cache (size=0)
         assertThat(cacheManager.size()).isEqualTo(1);
     }
 

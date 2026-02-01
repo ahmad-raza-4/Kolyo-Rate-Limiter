@@ -234,7 +234,13 @@ public class ConfigService {
             Integer capacity = (Integer) capacityObj;
             Double refillRate = ((Number) refillRateObj).doubleValue();
             Integer refillPeriod = (Integer) refillPeriodObj;
-            Integer priority = hash.containsKey("priority") ? (Integer) hash.get("priority") : 0;
+            
+            // Handle optional priority field with null check
+            Integer priority = 0;
+            if (hash.containsKey("priority")) {
+                Object priorityObj = hash.get("priority");
+                priority = priorityObj != null ? (Integer) priorityObj : 0;
+            }
 
             // Extract keyPattern from hash or derive from Redis key
             String keyPattern = (String) hash.get("keyPattern");
