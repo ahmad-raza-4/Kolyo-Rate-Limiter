@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Comprehensive load test for the entire rate limiter system.
+"""Comprehensive E2E load test for the entire rate limiter system.
 
-This script tests:
+This script provides full end-to-end testing for production launch:
 - All 5 rate limiting algorithms (TOKEN_BUCKET, SLIDING_WINDOW, SLIDING_WINDOW_COUNTER, FIXED_WINDOW, LEAKY_BUCKET)
-- All API endpoints (rate limit check, admin, benchmark, config)
-- Provides detailed metrics per algorithm and per endpoint
-- Simulates realistic user traffic patterns
-- Generates comprehensive reports with visualizations data
+- All API endpoints (rate limit check, admin, benchmark, config, health, metrics, performance)
+- Pre-flight health checks and validation
+- Post-test validation and regression detection
+- Detailed metrics per algorithm and per endpoint
+- Realistic user traffic patterns including burst scenarios
+- Comprehensive reports with visualizations data
+- Performance baseline tracking and regression analysis
 
 Usage:
   python load_testing/comprehensive_load_test.py \\
@@ -28,6 +31,7 @@ import csv
 import json
 import random
 import statistics
+import sys
 import threading
 import time
 from collections import defaultdict
@@ -103,7 +107,20 @@ class TestConfig:
     output_dir: Path
     raw_csv: bool
     seed: int
+    include_burst_test: bool
+    include_benchmark_test: bool
+    include_performance_test: bool
+    strict_validation: bool
     algorithms: List[AlgorithmConfig] = field(default_factory=list)
+
+
+@dataclass
+class HealthCheckResult:
+    """Health check validation result."""
+    passed: bool
+    redis_latency_ms: int
+    active_keys: int
+    issues: List[str]
 
 
 # ============================================================================
@@ -152,7 +169,7 @@ ENDPOINTS = {
     "rate_limit_check": {
         "path": "/api/ratelimit/check",
         "method": "POST",
-        "weight": 0.70,  # 70% of traffic
+        "weight": 0.60,  # 60% of traffic - core functionality
     },
     "get_config": {
         "path": "/api/ratelimit/config/{key}",
@@ -179,7 +196,128 @@ ENDPOINTS = {
         "method": "POST",
         "weight": 0.05,  # 5% of traffic
     },
+    "health_check": {
+        "path": "/actuator/health",
+        "method": "GET",
+        "weight": 0.05,  # 5% of traffic
+    },
+    "metrics": {
+        "path": "/actuator/metrics",
+        "method": "GET",
+        "weight": 0.05,  # 5% of traffic
+    },
 }
+
+
+# ============================================================================
+# Pre-flight Health Checks
+# ============================================================================
+
+def run_health_checks(base_url: str) -> HealthCheckResult:
+    """Run comprehensive health checks before testing."""
+    print(f"\n{'='*80}")
+    print(f"Running Pre-flight Health Checks")
+    print(f"{'='*80}\n")
+    
+    issues = []
+    redis_latency = 0
+    active_keys = 0
+    
+    parsed = urlparse(base_url)
+    conn = HTTPConnection(parsed.hostname, parsed.port or 8080, timeout=10)
+    
+    # Check main health endpoint
+    try:
+        status, body, _ = make_http_request(conn, "GET", "/actuator/health", None, {})
+        if status != 200:
+            issues.append(f"Health endpoint returned {status}")
+        else:
+            data = json.loads(body)
+            # Debug: print the actual health response structure
+            print(f"DEBUG: Health response structure: {json.dumps(data, indent=2)[:500]}")
+            
+            if data.get("status") != "UP":
+                issues.append(f"Service status is {data.get('status')}, not UP")
+            
+            # Check Redis health details
+            components = data.get("components", {})
+            redis_health = components.get("redisDetailedHealthIndicator", {})
+            redis_status = redis_health.get("status")
+            
+            if redis_status is None:
+                print(f"  ⚠ Redis health indicator not found in components")
+                print(f"  Available components: {list(components.keys())}")
+            elif redis_status != "UP":
+                issues.append(f"Redis health is {redis_status}")
+            else:
+                details = redis_health.get("details", {})
+                redis_latency = details.get("latencyMs", 0)
+                active_keys = details.get("activeKeys", 0)
+                
+                if redis_latency > 100:
+                    issues.append(f"Redis latency too high: {redis_latency}ms")
+                
+                print(f"✓ Redis Health: UP (latency={redis_latency}ms, keys={active_keys})")
+            
+            # Check rate limiter health
+            rl_health = components.get("rateLimiterHealthIndicator", {})
+            rl_status = rl_health.get("status")
+            
+            if rl_status is None:
+                print(f"  ⚠ Rate limiter health indicator not found in components")
+            elif rl_status != "UP":
+                issues.append(f"Rate limiter health is {rl_status}")
+            else:
+                print(f"✓ Rate Limiter Health: UP")
+    except Exception as e:
+        issues.append(f"Failed to reach health endpoint: {e}")
+    
+    # Check metrics endpoint
+    try:
+        status, body, _ = make_http_request(conn, "GET", "/actuator/metrics", None, {})
+        if status != 200:
+            issues.append(f"Metrics endpoint returned {status}")
+        else:
+            print(f"✓ Metrics endpoint: accessible")
+    except Exception as e:
+        issues.append(f"Failed to reach metrics endpoint: {e}")
+    
+    # Check rate limit endpoint with test request
+    try:
+        payload = json.dumps({
+            "key": "test:preflight:check",
+            "tokens": 1,
+            "clientIp": "127.0.0.1",
+            "endpoint": "/api/test",
+        })
+        headers = {"Content-Type": "application/json"}
+        status, body, _ = make_http_request(conn, "POST", "/api/ratelimit/check", payload, headers)
+        if status != 200:
+            issues.append(f"Rate limit check endpoint returned {status}")
+        else:
+            print(f"✓ Rate limit check endpoint: functional")
+    except Exception as e:
+        issues.append(f"Failed to test rate limit endpoint: {e}")
+    
+    conn.close()
+    
+    passed = len(issues) == 0
+    
+    if passed:
+        print(f"\n✓ All pre-flight checks PASSED")
+    else:
+        print(f"\n✗ Pre-flight checks FAILED:")
+        for issue in issues:
+            print(f"  - {issue}")
+    
+    print()
+    
+    return HealthCheckResult(
+        passed=passed,
+        redis_latency_ms=redis_latency,
+        active_keys=active_keys,
+        issues=issues
+    )
 
 
 # ============================================================================
@@ -319,6 +457,12 @@ def build_request_for_endpoint(
             "refillPeriodSeconds": config.refill_period_seconds,
         })
     
+    elif endpoint_name == "health_check":
+        path = "/actuator/health"
+    
+    elif endpoint_name == "metrics":
+        path = "/actuator/metrics"
+    
     return method, path, payload, headers
 
 
@@ -410,6 +554,686 @@ def worker_thread(
             time.sleep(sleep_time)
     
     conn.close()
+
+
+# ============================================================================
+# Burst Testing
+# ============================================================================
+
+def run_burst_test(config: TestConfig) -> List[RequestMetric]:
+    """
+    Run burst test scenario: sudden spike in traffic.
+    Tests system behavior under sudden load increase.
+    """
+    print(f"\n{'='*80}")
+    print(f"Running Burst Test")
+    print(f"{'='*80}\n")
+    
+    metrics: List[RequestMetric] = []
+    lock = threading.Lock()
+    
+    # Use 3x normal concurrency for burst
+    burst_concurrency = config.concurrency * 3
+    burst_duration = 30  # 30 second burst
+    
+    print(f"Burst Parameters:")
+    print(f"  Concurrency: {burst_concurrency} (3x normal)")
+    print(f"  Duration: {burst_duration}s")
+    print(f"  Target RPS: {config.target_rps * 3}\n")
+    
+    burst_config = TestConfig(
+        base_url=config.base_url,
+        duration_seconds=burst_duration,
+        warmup_seconds=0,
+        concurrency=burst_concurrency,
+        target_rps=config.target_rps * 3,
+        output_dir=config.output_dir,
+        raw_csv=False,
+        seed=config.seed,
+        algorithms=config.algorithms,
+        include_burst_test=False,
+        include_benchmark_test=False,
+        include_performance_test=False,
+        strict_validation=False,
+    )
+    
+    start_time = time.time()
+    
+    with ThreadPoolExecutor(max_workers=burst_concurrency) as executor:
+        futures = []
+        for i in range(burst_concurrency):
+            future = executor.submit(worker_thread, i, burst_config, metrics, lock)
+            futures.append(future)
+        
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Burst worker error: {e}")
+    
+    end_time = time.time()
+    actual_duration = int(end_time - start_time)
+    
+    print(f"\n✓ Burst test completed in {actual_duration}s")
+    print(f"  Collected {len(metrics):,} metrics\n")
+    
+    return metrics
+
+
+# ============================================================================
+# Benchmark Testing
+# ============================================================================
+
+def run_benchmark_tests(config: TestConfig) -> Dict[str, Any]:
+    """Run benchmark tests for all algorithms."""
+    print(f"\n{'='*80}")
+    print(f"Running Benchmark Tests")
+    print(f"{'='*80}\n")
+    
+    parsed = urlparse(config.base_url)
+    conn = HTTPConnection(parsed.hostname, parsed.port or 8080, timeout=60)
+    
+    benchmark_results = {}
+    
+    for algo_config in config.algorithms:
+        print(f"Benchmarking {algo_config.name}...")
+        
+        payload = json.dumps({
+            "algorithm": algo_config.name,
+            "capacity": algo_config.capacity,
+            "refillRate": algo_config.refill_rate,
+            "refillPeriodSeconds": algo_config.refill_period_seconds,
+            "totalRequests": 10000,
+            "concurrentThreads": 50,
+            "durationSeconds": 60,
+        })
+        
+        headers = {"Content-Type": "application/json"}
+        
+        try:
+            status, body, _ = make_http_request(conn, "POST", "/api/benchmark/run", payload, headers)
+            if status == 200:
+                result = json.loads(body)
+                benchmark_results[algo_config.name] = result
+                print(f"  ✓ {algo_config.name}: {result.get('throughputRps', 0):.2f} RPS, "
+                      f"P95={result.get('latency', {}).get('p95Micros', 0)}μs")
+            else:
+                print(f"  ✗ {algo_config.name}: HTTP {status}")
+        except Exception as e:
+            print(f"  ✗ {algo_config.name}: {e}")
+    
+    conn.close()
+    print()
+    
+    return benchmark_results
+
+
+# ============================================================================
+# Performance Regression Testing
+# ============================================================================
+
+def run_performance_tests(config: TestConfig) -> Dict[str, Any]:
+    """Run performance regression tests for all algorithms."""
+    print(f"\n{'='*80}")
+    print(f"Running Performance Regression Tests")
+    print(f"{'='*80}\n")
+    
+    parsed = urlparse(config.base_url)
+    conn = HTTPConnection(parsed.hostname, parsed.port or 8080, timeout=120)
+    
+    performance_results = {}
+    
+    for algo_config in config.algorithms:
+        print(f"Testing {algo_config.name} for regression...")
+        
+        payload = json.dumps({
+            "algorithm": algo_config.name,
+            "capacity": algo_config.capacity,
+            "refillRate": algo_config.refill_rate,
+            "refillPeriodSeconds": algo_config.refill_period_seconds,
+            "totalRequests": 10000,
+            "concurrentThreads": 50,
+            "durationSeconds": 60,
+        })
+        
+        headers = {"Content-Type": "application/json"}
+        
+        try:
+            status, body, _ = make_http_request(conn, "POST", "/api/performance/run-and-analyze", payload, headers)
+            if status == 200:
+                result = json.loads(body)
+                performance_results[algo_config.name] = result
+                status_str = result.get('status', 'UNKNOWN')
+                message = result.get('message', '')
+                
+                if status_str == "REGRESSION_DETECTED":
+                    print(f"  ⚠ {algo_config.name}: REGRESSION - {message}")
+                elif status_str == "BASELINE":
+                    print(f"  ℹ {algo_config.name}: BASELINE - {message}")
+                else:
+                    print(f"  ✓ {algo_config.name}: OK - {message}")
+            else:
+                print(f"  ✗ {algo_config.name}: HTTP {status}")
+        except Exception as e:
+            print(f"  ✗ {algo_config.name}: {e}")
+    
+    conn.close()
+    print()
+    
+    return performance_results
+
+
+# ============================================================================
+# Edge Case Testing - Verify Rate Limiting Correctness
+# ============================================================================
+
+@dataclass
+class EdgeCaseResult:
+    """Result of an edge case test."""
+    test_name: str
+    passed: bool
+    expected_allowed: int
+    expected_denied: int
+    actual_allowed: int
+    actual_denied: int
+    issues: List[str]
+    details: Dict[str, Any]
+
+
+def run_edge_case_tests(config: TestConfig) -> List[EdgeCaseResult]:
+    """
+    Run edge case tests to verify rate limiting is working correctly.
+    
+    Tests include:
+    1. Exhaust bucket - send more requests than capacity, verify denials
+    2. Burst beyond capacity - rapid requests should be denied
+    3. Token tracking - verify remaining tokens decrease correctly
+    4. Retry-after headers - verify they're set on denials
+    5. Gradual refill - verify tokens refill over time
+    """
+    print(f"\n{'='*80}")
+    print(f"Running Edge Case Tests - Rate Limiting Correctness")
+    print(f"{'='*80}\n")
+    
+    parsed = urlparse(config.base_url)
+    results = []
+    
+    # Test 1: Exhaust bucket test
+    results.append(test_exhaust_bucket(parsed, config.algorithms[0]))  # TOKEN_BUCKET
+    
+    # Test 2: Burst beyond capacity
+    results.append(test_burst_beyond_capacity(parsed, config.algorithms[0]))
+    
+    # Test 3: Token tracking validation
+    results.append(test_token_tracking(parsed, config.algorithms[0]))
+    
+    # Test 4: Retry-after header validation
+    results.append(test_retry_after_headers(parsed, config.algorithms[0]))
+    
+    # Test 5: Gradual refill validation
+    results.append(test_gradual_refill(parsed, config.algorithms[0]))
+    
+    # Summary
+    passed_count = sum(1 for r in results if r.passed)
+    total_count = len(results)
+    
+    print(f"\n{'='*80}")
+    print(f"Edge Case Test Summary: {passed_count}/{total_count} PASSED")
+    print(f"{'='*80}\n")
+    
+    for result in results:
+        status = "✓ PASS" if result.passed else "✗ FAIL"
+        print(f"{status}: {result.test_name}")
+        if not result.passed:
+            for issue in result.issues:
+                print(f"  - {issue}")
+    
+    print()
+    return results
+
+
+def test_exhaust_bucket(parsed, algo_config: AlgorithmConfig) -> EdgeCaseResult:
+    """Test that requests are denied after exhausting the bucket capacity."""
+    test_name = "Exhaust Bucket Test"
+    print(f"Running: {test_name}...")
+    
+    conn = HTTPConnection(parsed.hostname, parsed.port or 8080, timeout=10)
+    key = f"edgecase:exhaust:{int(time.time())}"
+    issues = []
+    
+    # Configure a small bucket for testing with ZERO refill during test
+    capacity = 10
+    refill_rate = 0.001  # Nearly zero - 0.001 tokens per 3600 seconds = effectively no refill
+    refill_period = 3600  # 1 hour - ensures no refill during test
+    
+    # Configure the rate limit
+    setup_key_config(conn, key, algo_config.name, capacity, refill_rate, refill_period)
+    
+    allowed_count = 0
+    denied_count = 0
+    error_count = 0
+    requests_to_send = capacity + 5  # Send more than capacity
+    
+    responses = []
+    for i in range(requests_to_send):
+        payload = json.dumps({
+            "key": key,
+            "tokens": 1,
+            "clientIp": "127.0.0.1",
+            "endpoint": "/api/test",
+        })
+        headers = {"Content-Type": "application/json"}
+        
+        try:
+            status, body, _ = make_http_request(conn, "POST", "/api/ratelimit/check", payload, headers)
+            if status == 200:
+                data = json.loads(body)
+                is_allowed = data.get("allowed")
+                responses.append({"req": i, "status":status, "allowed": is_allowed, "remaining": data.get("remainingTokens")})
+                if is_allowed:
+                    allowed_count += 1
+                else:
+                    denied_count += 1
+            elif status == 429:
+                # HTTP 429 is a valid denial response
+                denied_count += 1
+                responses.append({"req": i, "status": status, "denied": True})
+            else:
+                error_count += 1
+                responses.append({"req": i, "status": status, "error": True})
+        except Exception as e:
+            error_count += 1
+            issues.append(f"Request {i} failed: {e}")
+    
+    conn.close()
+    
+    # Debug output
+    print(f"  Debug: First 5 responses: {responses[:5]}")
+    print(f"  Debug: Last 5 responses: {responses[-5:]}")
+    
+    # Validate: first 'capacity' should be allowed, rest denied
+    expected_allowed = capacity
+    expected_denied = requests_to_send - capacity
+    
+    # Allow 1 token margin for potential race conditions
+    if allowed_count < expected_allowed - 1 or allowed_count > expected_allowed + 1:
+        issues.append(f"Expected ~{expected_allowed} allowed, got {allowed_count}")
+    
+    if denied_count < expected_denied - 1:
+        issues.append(f"Expected at least {expected_denied - 1} denied, got {denied_count}")
+    
+    if error_count > 0:
+        issues.append(f"Got {error_count} errors (HTTP failures)")
+    
+    passed = len(issues) == 0
+    
+    print(f"  Sent: {requests_to_send}, Allowed: {allowed_count}, Denied: {denied_count}, Errors: {error_count}")
+    print(f"  {'✓ PASS' if passed else '✗ FAIL'}")
+    
+    return EdgeCaseResult(
+        test_name=test_name,
+        passed=passed,
+        expected_allowed=expected_allowed,
+        expected_denied=expected_denied,
+        actual_allowed=allowed_count,
+        actual_denied=denied_count,
+        issues=issues,
+        details={"capacity": capacity, "requests_sent": requests_to_send, "responses": responses}
+    )
+
+
+def test_burst_beyond_capacity(parsed, algo_config: AlgorithmConfig) -> EdgeCaseResult:
+    """Test rapid requests beyond capacity are properly denied."""
+    test_name = "Burst Beyond Capacity Test"
+    print(f"Running: {test_name}...")
+    
+    conn = HTTPConnection(parsed.hostname, parsed.port or 8080, timeout=10)
+    key = f"edgecase:burst:{int(time.time())}"
+    issues = []
+    
+    capacity = 20
+    burst_size = 50  # Send 2.5x capacity rapidly
+    refill_rate = 0.001  # Nearly zero refill
+    refill_period = 3600  # 1 hour
+    
+    setup_key_config(conn, key, algo_config.name, capacity, refill_rate, refill_period)
+    
+    allowed_count = 0
+    denied_count = 0
+    
+    # Send burst of requests as fast as possible
+    for i in range(burst_size):
+        payload = json.dumps({
+            "key": key,
+            "tokens": 1,
+            "clientIp": "127.0.0.1",
+            "endpoint": "/api/test",
+        })
+        headers = {"Content-Type": "application/json"}
+        
+        try:
+            status, body, _ = make_http_request(conn, "POST", "/api/ratelimit/check", payload, headers)
+            if status == 200:
+                data = json.loads(body)
+                if data.get("allowed"):
+                    allowed_count += 1
+                else:
+                    denied_count += 1
+            elif status == 429:
+                # HTTP 429 is a valid denial response
+                denied_count += 1
+        except Exception as e:
+            issues.append(f"Request {i} failed: {e}")
+    
+    conn.close()
+    
+    # At least (burst_size - capacity) should be denied
+    expected_denied = burst_size - capacity
+    
+    # Allow 2 tokens margin for race conditions
+    if denied_count < expected_denied - 2:
+        issues.append(f"Expected ~{expected_denied} denied, got only {denied_count}")
+    
+    if allowed_count > capacity + 2:
+        issues.append(f"Too many allowed: {allowed_count} (capacity: {capacity})")
+    
+    passed = len(issues) == 0
+    
+    print(f"  Burst: {burst_size}, Allowed: {allowed_count}, Denied: {denied_count}")
+    print(f"  {'✓ PASS' if passed else '✗ FAIL'}")
+    
+    return EdgeCaseResult(
+        test_name=test_name,
+        passed=passed,
+        expected_allowed=capacity,
+        expected_denied=expected_denied,
+        actual_allowed=allowed_count,
+        actual_denied=denied_count,
+        issues=issues,
+        details={"capacity": capacity, "burst_size": burst_size}
+    )
+
+
+def test_token_tracking(parsed, algo_config: AlgorithmConfig) -> EdgeCaseResult:
+    """Test that remaining tokens are tracked correctly."""
+    test_name = "Token Tracking Test"
+    print(f"Running: {test_name}...")
+    
+    conn = HTTPConnection(parsed.hostname, parsed.port or 8080, timeout=10)
+    key = f"edgecase:tokens:{int(time.time())}"
+    issues = []
+    
+    capacity = 15
+    refill_rate = 0.001  # Nearly zero refill
+    refill_period = 3600
+    
+    setup_key_config(conn, key, algo_config.name, capacity, refill_rate, refill_period)
+    
+    remaining_tokens_list = []
+    
+    # Send requests and track remaining tokens
+    for i in range(capacity):
+        payload = json.dumps({
+            "key": key,
+            "tokens": 1,
+            "clientIp": "127.0.0.1",
+            "endpoint": "/api/test",
+        })
+        headers = {"Content-Type": "application/json"}
+        
+        try:
+            status, body, _ = make_http_request(conn, "POST", "/api/ratelimit/check", payload, headers)
+            if status == 200:
+                data = json.loads(body)
+                if data.get("allowed"):
+                    remaining = data.get("remainingTokens")
+                    if remaining is not None:
+                        remaining_tokens_list.append(remaining)
+        except Exception as e:
+            issues.append(f"Request {i} failed: {e}")
+    
+    conn.close()
+    
+    # Validate: remaining tokens should strictly decrease (no refill)
+    if len(remaining_tokens_list) > 2:
+        # Check that tokens are monotonically decreasing
+        is_decreasing = all(
+            remaining_tokens_list[i] >= remaining_tokens_list[i + 1]
+            for i in range(len(remaining_tokens_list) - 1)
+        )
+        
+        if not is_decreasing:
+            issues.append(f"Tokens not decreasing monotonically: {remaining_tokens_list}")
+    else:
+        issues.append("Not enough token data collected")
+    
+    passed = len(issues) == 0
+    
+    print(f"  Tracked {len(remaining_tokens_list)} token values")
+    if remaining_tokens_list:
+        print(f"  Range: {min(remaining_tokens_list)} to {max(remaining_tokens_list)}")
+    print(f"  {'✓ PASS' if passed else '✗ FAIL'}")
+    
+    return EdgeCaseResult(
+        test_name=test_name,
+        passed=passed,
+        expected_allowed=capacity,
+        expected_denied=0,
+        actual_allowed=len(remaining_tokens_list),
+        actual_denied=0,
+        issues=issues,
+        details={"remaining_tokens": remaining_tokens_list}
+    )
+
+
+def test_retry_after_headers(parsed, algo_config: AlgorithmConfig) -> EdgeCaseResult:
+    """Test that retry-after headers are set correctly on denied requests."""
+    test_name = "Retry-After Headers Test"
+    print(f"Running: {test_name}...")
+    
+    conn = HTTPConnection(parsed.hostname, parsed.port or 8080, timeout=10)
+    key = f"edgecase:retry:{int(time.time())}"
+    issues = []
+    
+    capacity = 5
+    refill_rate = 0.001  # Nearly zero refill
+    refill_period = 3600
+    
+    setup_key_config(conn, key, algo_config.name, capacity, refill_rate, refill_period)
+    
+    # Exhaust the bucket
+    for i in range(capacity):
+        payload = json.dumps({
+            "key": key,
+            "tokens": 1,
+            "clientIp": "127.0.0.1",
+            "endpoint": "/api/test",
+        })
+        headers = {"Content-Type": "application/json"}
+        make_http_request(conn, "POST", "/api/ratelimit/check", payload, headers)
+    
+    # Now send requests that should be denied
+    retry_after_values = []
+    denied_count = 0
+    for i in range(5):  # Try 5 requests instead of 3 for better validation
+        payload = json.dumps({
+            "key": key,
+            "tokens": 1,
+            "clientIp": "127.0.0.1",
+            "endpoint": "/api/test",
+        })
+        headers = {"Content-Type": "application/json"}
+        
+        try:
+            status, body, response_headers = make_http_request(conn, "POST", "/api/ratelimit/check", payload, headers)
+            if status == 200:
+                data = json.loads(body)
+                if not data.get("allowed"):
+                    denied_count += 1
+                    retry_after = data.get("retryAfterSeconds")
+                    if retry_after is not None and retry_after > 0:
+                        retry_after_values.append(retry_after)
+            elif status == 429:
+                # HTTP 429 is a valid denial response
+                denied_count += 1
+                # Try to get retry-after from response headers or body
+                if body:
+                    try:
+                        data = json.loads(body)
+                        retry_after = data.get("retryAfterSeconds")
+                        if retry_after is not None and retry_after > 0:
+                            retry_after_values.append(retry_after)
+                    except json.JSONDecodeError:
+                        # Body is not valid JSON (e.g., HTML error page); ignore and fall back to headers.
+                        pass
+                # Also check Retry-After header
+                retry_after_header = response_headers.get("Retry-After")
+                if retry_after_header:
+                    try:
+                        retry_after_values.append(int(retry_after_header))
+                    except ValueError:
+                        # Ignore invalid Retry-After header values; they are non-fatal for this validation.
+                        pass
+        except Exception as e:
+            issues.append(f"Request {i} failed: {e}")
+    
+    conn.close()
+    
+    # Validate: denied requests should have retry-after set
+    if denied_count == 0:
+        issues.append(f"No requests were denied (expected at least 3)")
+    elif len(retry_after_values) == 0:
+        issues.append("No retry-after values found on denied requests")
+    elif any(v <= 0 for v in retry_after_values):
+        issues.append(f"Invalid retry-after values: {retry_after_values}")
+    
+    passed = len(issues) == 0
+    
+    print(f"  Denied: {denied_count}, Retry-after values: {retry_after_values}")
+    print(f"  {'✓ PASS' if passed else '✗ FAIL'}")
+    
+    return EdgeCaseResult(
+        test_name=test_name,
+        passed=passed,
+        expected_allowed=0,
+        expected_denied=5,
+        actual_allowed=0,
+        actual_denied=denied_count,
+        issues=issues,
+        details={"retry_after_values": retry_after_values, "denied_count": denied_count}
+    )
+
+
+def test_gradual_refill(parsed, algo_config: AlgorithmConfig) -> EdgeCaseResult:
+    """Test that tokens refill gradually over time."""
+    test_name = "Gradual Refill Test"
+    print(f"Running: {test_name}...")
+    
+    conn = HTTPConnection(parsed.hostname, parsed.port or 8080, timeout=10)
+    key = f"edgecase:refill:{int(time.time())}"
+    issues = []
+    
+    capacity = 10
+    refill_rate = 5.0  # 5 tokens per second
+    refill_period = 1
+    
+    setup_key_config(conn, key, algo_config.name, capacity, refill_rate, refill_period)
+    
+    # Exhaust the bucket
+    allowed_initial = 0
+    for i in range(capacity):
+        payload = json.dumps({
+            "key": key,
+            "tokens": 1,
+            "clientIp": "127.0.0.1",
+            "endpoint": "/api/test",
+        })
+        headers = {"Content-Type": "application/json"}
+        status, body, _ = make_http_request(conn, "POST", "/api/ratelimit/check", payload, headers)
+        if status == 200 and json.loads(body).get("allowed"):
+            allowed_initial += 1
+    
+    # Wait for refill (2 seconds should add ~10 tokens at 5/sec)
+    print(f"  Waiting 2s for refill...")
+    time.sleep(2)
+    
+    # Try requests again
+    allowed_after_refill = 0
+    for i in range(capacity):
+        payload = json.dumps({
+            "key": key,
+            "tokens": 1,
+            "clientIp": "127.0.0.1",
+            "endpoint": "/api/test",
+        })
+        headers = {"Content-Type": "application/json"}
+        status, body, _ = make_http_request(conn, "POST", "/api/ratelimit/check", payload, headers)
+        if status == 200 and json.loads(body).get("allowed"):
+            allowed_after_refill += 1
+    
+    conn.close()
+    
+    # Validate: after refill, we should be able to make more requests
+    expected_refilled = int(refill_rate * 2)  # ~10 tokens in 2 seconds
+    
+    if allowed_after_refill < expected_refilled * 0.7:  # Allow 30% margin
+        issues.append(f"Expected ~{expected_refilled} allowed after refill, got {allowed_after_refill}")
+    
+    if allowed_initial != capacity:
+        issues.append(f"Initial bucket not full: expected {capacity}, got {allowed_initial}")
+    
+    passed = len(issues) == 0
+    
+    print(f"  Initial allowed: {allowed_initial}, After refill: {allowed_after_refill}")
+    print(f"  {'✓ PASS' if passed else '✗ FAIL'}")
+    
+    return EdgeCaseResult(
+        test_name=test_name,
+        passed=passed,
+        expected_allowed=expected_refilled,
+        expected_denied=0,
+        actual_allowed=allowed_after_refill,
+        actual_denied=0,
+        issues=issues,
+        details={
+            "initial_allowed": allowed_initial,
+            "after_refill_allowed": allowed_after_refill,
+            "refill_rate": refill_rate,
+            "wait_time_seconds": 2
+        }
+    )
+
+
+def setup_key_config(conn: HTTPConnection, key: str, algorithm: str, capacity: int, refill_rate: float, refill_period: int):
+    """Helper to configure a specific key for testing."""
+    path = f"/api/ratelimit/config/keys/{key}"
+    payload = json.dumps({
+        "algorithm": algorithm,
+        "capacity": capacity,
+        "refillRate": refill_rate,
+        "refillPeriodSeconds": refill_period,
+    })
+    headers = {"Content-Type": "application/json"}
+    
+    try:
+        status, body, resp_headers = make_http_request(conn, "POST", path, payload, headers)
+        if status != 200 and status != 201:
+            print(f"  ⚠ Warning: Failed to configure key {key}: HTTP {status}")
+            if body:
+                print(f"    Response: {body[:200]}")
+        else:
+            # Verify configuration was applied by reading it back
+            verify_status, verify_body, _ = make_http_request(conn, "GET", f"/api/ratelimit/config/{key}", None, {})
+            if verify_status == 200:
+                config_data = json.loads(verify_body)
+                actual_capacity = config_data.get("capacity")
+                actual_refill = config_data.get("refillRate")
+                if actual_capacity != capacity or abs(actual_refill - refill_rate) > 0.001:
+                    print(f"  ⚠ Warning: Config mismatch for {key}")
+                    print(f"    Expected: capacity={capacity}, refillRate={refill_rate}")
+                    print(f"    Actual: capacity={actual_capacity}, refillRate={actual_refill}")
+    except Exception as e:
+        print(f"  ⚠ Warning: Error configuring key {key}: {e}")
 
 
 # ============================================================================
@@ -507,6 +1331,11 @@ def generate_reports(
     config: TestConfig,
     all_metrics: List[RequestMetric],
     duration_seconds: int,
+    burst_metrics: Optional[List[RequestMetric]] = None,
+    benchmark_results: Optional[Dict[str, Any]] = None,
+    performance_results: Optional[Dict[str, Any]] = None,
+    health_check: Optional[HealthCheckResult] = None,
+    edge_case_results: Optional[List[EdgeCaseResult]] = None,
 ) -> None:
     """Generate comprehensive reports."""
     output_dir = config.output_dir
@@ -548,6 +1377,42 @@ def generate_reports(
         for endpoint, metrics in endpoints.items():
             algo_endpoint_stats[algo][endpoint] = aggregate_metrics(metrics, duration_seconds)
     
+    # Burst test analysis
+    burst_analysis = None
+    if burst_metrics:
+        burst_stats = aggregate_metrics(burst_metrics, 30)
+        burst_analysis = {
+            "overall": stats_to_dict(burst_stats),
+            "degradation_vs_normal": {
+                "latency_p95_increase_pct": ((burst_stats.p95_ms - overall_stats.p95_ms) / overall_stats.p95_ms * 100) if overall_stats.p95_ms > 0 else 0,
+                "latency_p99_increase_pct": ((burst_stats.p99_ms - overall_stats.p99_ms) / overall_stats.p99_ms * 100) if overall_stats.p99_ms > 0 else 0,
+                "error_rate_increase_pct": burst_stats.error_rate - overall_stats.error_rate,
+            }
+        }
+    
+    # Edge case test results
+    edge_case_summary = None
+    if edge_case_results:
+        passed_count = sum(1 for r in edge_case_results if r.passed)
+        edge_case_summary = {
+            "total_tests": len(edge_case_results),
+            "passed": passed_count,
+            "failed": len(edge_case_results) - passed_count,
+            "tests": [
+                {
+                    "name": r.test_name,
+                    "passed": r.passed,
+                    "expected_allowed": r.expected_allowed,
+                    "expected_denied": r.expected_denied,
+                    "actual_allowed": r.actual_allowed,
+                    "actual_denied": r.actual_denied,
+                    "issues": r.issues,
+                    "details": r.details
+                }
+                for r in edge_case_results
+            ]
+        }
+    
     # Build comprehensive summary
     summary = {
         "test_info": {
@@ -557,6 +1422,13 @@ def generate_reports(
             "target_rps": config.target_rps,
             "base_url": config.base_url,
         },
+        "health_check": {
+            "passed": health_check.passed if health_check else None,
+            "redis_latency_ms": health_check.redis_latency_ms if health_check else None,
+            "active_keys": health_check.active_keys if health_check else None,
+            "issues": health_check.issues if health_check else [],
+        } if health_check else None,
+        "edge_case_tests": edge_case_summary,
         "overall": stats_to_dict(overall_stats),
         "by_algorithm": {algo: stats_to_dict(stats) for algo, stats in algorithm_stats.items()},
         "by_endpoint": {endpoint: stats_to_dict(stats) for endpoint, stats in endpoint_stats.items()},
@@ -567,6 +1439,9 @@ def generate_reports(
             }
             for algo, endpoints in algo_endpoint_stats.items()
         },
+        "burst_test": burst_analysis,
+        "benchmark_results": benchmark_results,
+        "performance_results": performance_results,
     }
     
     # Write summary JSON
@@ -587,6 +1462,13 @@ def generate_reports(
         algo_timeline_path.write_text(json.dumps(algo_timeline, indent=2))
         print(f"✓ {algo} timeline written to: {algo_timeline_path}")
     
+    # Write burst timeline if exists
+    if burst_metrics:
+        burst_timeline = build_timeline(burst_metrics)
+        burst_timeline_path = output_dir / "timeline_burst.json"
+        burst_timeline_path.write_text(json.dumps(burst_timeline, indent=2))
+        print(f"✓ Burst timeline written to: {burst_timeline_path}")
+    
     # Write raw CSV if requested
     if config.raw_csv:
         csv_path = output_dir / "raw_metrics.csv"
@@ -604,7 +1486,7 @@ def generate_reports(
         print(f"✓ Raw metrics CSV written to: {csv_path}")
     
     # Print console summary
-    print_console_summary(overall_stats, algorithm_stats, endpoint_stats)
+    print_console_summary(overall_stats, algorithm_stats, endpoint_stats, burst_analysis, performance_results)
 
 
 def stats_to_dict(stats: AggregateStats) -> Dict[str, Any]:
@@ -637,14 +1519,16 @@ def print_console_summary(
     overall: AggregateStats,
     by_algorithm: Dict[str, AggregateStats],
     by_endpoint: Dict[str, AggregateStats],
+    burst_analysis: Optional[Dict[str, Any]] = None,
+    performance_results: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Print formatted summary to console."""
     print(f"\n{'='*80}")
     print(f"OVERALL RESULTS")
     print(f"{'='*80}")
     print(f"Total Requests:    {overall.total:,}")
-    print(f"Allowed:           {overall.allowed:,} ({overall.allowed/overall.total*100:.1f}%)")
-    print(f"Denied:            {overall.denied:,} ({overall.denied/overall.total*100:.1f}%)")
+    print(f"Allowed:           {overall.allowed:,} ({overall.allowed/overall.total*100:.1f}%)" if overall.total > 0 else "Allowed:           0")
+    print(f"Denied:            {overall.denied:,} ({overall.denied/overall.total*100:.1f}%)" if overall.total > 0 else "Denied:            0")
     print(f"Errors:            {overall.errors:,} ({overall.error_rate:.2f}%)")
     print(f"Throughput:        {overall.rps:.2f} req/s")
     print(f"Success Rate:      {overall.success_rate:.2f}%")
@@ -684,7 +1568,104 @@ def print_console_summary(
         print(f"  P95 Latency:     {stats.p95_ms:.3f} ms")
         print(f"  P99 Latency:     {stats.p99_ms:.3f} ms")
     
+    if burst_analysis:
+        print(f"\n{'='*80}")
+        print(f"BURST TEST ANALYSIS")
+        print(f"{'='*80}")
+        overall_burst = burst_analysis["overall"]
+        degradation = burst_analysis["degradation_vs_normal"]
+        print(f"Total Requests:    {overall_burst['total_requests']:,}")
+        print(f"Error Rate:        {overall_burst['error_rate_percent']:.2f}%")
+        print(f"P95 Latency:       {overall_burst['latency_ms']['p95']:.3f} ms")
+        print(f"P99 Latency:       {overall_burst['latency_ms']['p99']:.3f} ms")
+        print(f"\nDegradation vs Normal:")
+        print(f"  P95 Increase:    {degradation['latency_p95_increase_pct']:+.1f}%")
+        print(f"  P99 Increase:    {degradation['latency_p99_increase_pct']:+.1f}%")
+        print(f"  Error Rate Δ:    {degradation['error_rate_increase_pct']:+.2f}%")
+    
+    if performance_results:
+        print(f"\n{'='*80}")
+        print(f"PERFORMANCE REGRESSION ANALYSIS")
+        print(f"{'='*80}")
+        for algo, result in sorted(performance_results.items()):
+            status = result.get('status', 'UNKNOWN')
+            message = result.get('message', '')
+            
+            status_symbol = "✓" if status == "OK" else "⚠" if status == "REGRESSION_DETECTED" else "ℹ"
+            print(f"\n{status_symbol} {algo}: {status}")
+            print(f"  {message}")
+    
     print(f"\n{'='*80}\n")
+
+
+# ============================================================================
+# Post-Test Validation
+# ============================================================================
+
+def run_post_test_validation(base_url: str, overall_stats: AggregateStats, strict: bool = True) -> bool:
+    """Run post-test validation checks."""
+    print(f"\n{'='*80}")
+    print(f"Running Post-Test Validation")
+    print(f"{'='*80}\n")
+    
+    issues = []
+    
+    # Check error rate threshold
+    if overall_stats.error_rate > 5.0:
+        issues.append(f"Error rate too high: {overall_stats.error_rate:.2f}% (threshold: 5%)")
+    else:
+        print(f"✓ Error rate within acceptable range: {overall_stats.error_rate:.2f}%")
+    
+    # Check latency thresholds
+    if overall_stats.p95_ms > 100.0:
+        msg = f"P95 latency too high: {overall_stats.p95_ms:.3f}ms (threshold: 100ms)"
+        if strict:
+            issues.append(msg)
+        else:
+            print(f"⚠ {msg}")
+    else:
+        print(f"✓ P95 latency acceptable: {overall_stats.p95_ms:.3f}ms")
+    
+    if overall_stats.p99_ms > 200.0:
+        msg = f"P99 latency too high: {overall_stats.p99_ms:.3f}ms (threshold: 200ms)"
+        if strict:
+            issues.append(msg)
+        else:
+            print(f"⚠ {msg}")
+    else:
+        print(f"✓ P99 latency acceptable: {overall_stats.p99_ms:.3f}ms")
+    
+    # Check system health after test
+    parsed = urlparse(base_url)
+    conn = HTTPConnection(parsed.hostname, parsed.port or 8080, timeout=10)
+    
+    try:
+        status, body, _ = make_http_request(conn, "GET", "/actuator/health", None, {})
+        if status != 200:
+            issues.append(f"Health endpoint returned {status} after test")
+        else:
+            data = json.loads(body)
+            if data.get("status") != "UP":
+                issues.append(f"Service status is {data.get('status')} after test")
+            else:
+                print(f"✓ System health: UP after test")
+    except Exception as e:
+        issues.append(f"Failed to reach health endpoint after test: {e}")
+    
+    conn.close()
+    
+    passed = len(issues) == 0
+    
+    if passed:
+        print(f"\n✓ All post-test validations PASSED")
+    else:
+        print(f"\n✗ Post-test validations FAILED:")
+        for issue in issues:
+            print(f"  - {issue}")
+    
+    print()
+    
+    return passed
 
 
 # ============================================================================
@@ -743,7 +1724,7 @@ def setup_configurations(base_url: str, algorithms: List[AlgorithmConfig]) -> bo
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Comprehensive load test for rate limiter system",
+        description="Comprehensive E2E load test for rate limiter system",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--base-url", default="http://localhost:8080", help="Base URL of the service")
@@ -755,6 +1736,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--raw-csv", action="store_true", help="Generate raw metrics CSV")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--skip-setup", action="store_true", help="Skip configuration setup")
+    parser.add_argument("--skip-burst-test", action="store_true", help="Skip burst testing")
+    parser.add_argument("--skip-benchmark-test", action="store_true", help="Skip benchmark testing")
+    parser.add_argument("--skip-performance-test", action="store_true", help="Skip performance regression testing")
+    parser.add_argument("--skip-health-checks", action="store_true", help="Skip health checks")
+    parser.add_argument("--strict-validation", action="store_true", help="Enable strict post-test validation")
     return parser.parse_args()
 
 
@@ -774,10 +1760,14 @@ def main() -> None:
         raw_csv=args.raw_csv,
         seed=args.seed,
         algorithms=DEFAULT_ALGORITHM_CONFIGS,
+        include_burst_test=not args.skip_burst_test,
+        include_benchmark_test=not args.skip_benchmark_test,
+        include_performance_test=not args.skip_performance_test,
+        strict_validation=args.strict_validation,
     )
     
     print(f"\n{'='*80}")
-    print(f"COMPREHENSIVE RATE LIMITER LOAD TEST")
+    print(f"COMPREHENSIVE E2E RATE LIMITER LOAD TEST")
     print(f"{'='*80}")
     print(f"Base URL:          {config.base_url}")
     print(f"Duration:          {config.duration_seconds}s")
@@ -786,7 +1776,18 @@ def main() -> None:
     print(f"Target RPS:        {config.target_rps}")
     print(f"Algorithms:        {', '.join(a.name for a in config.algorithms)}")
     print(f"Output Dir:        {config.output_dir}")
+    print(f"Burst Test:        {'Enabled' if config.include_burst_test else 'Disabled'}")
+    print(f"Benchmark Test:    {'Enabled' if config.include_benchmark_test else 'Disabled'}")
+    print(f"Performance Test:  {'Enabled' if config.include_performance_test else 'Disabled'}")
     print(f"{'='*80}\n")
+    
+    # Pre-flight health checks
+    health_check = None
+    if not args.skip_health_checks:
+        health_check = run_health_checks(config.base_url)
+        if not health_check.passed and config.strict_validation:
+            print("✗ Pre-flight health checks failed. Exiting...")
+            sys.exit(1)
     
     # Setup configurations
     if not args.skip_setup:
@@ -799,9 +1800,12 @@ def main() -> None:
         time.sleep(config.warmup_seconds)
         print("Warmup complete.\n")
     
-    # Run load test
+    # Run edge case tests (validate rate limiting correctness)
+    edge_case_results = run_edge_case_tests(config)
+    
+    # Run main load test
     print(f"{'='*80}")
-    print(f"Starting load test...")
+    print(f"Starting Main Load Test...")
     print(f"{'='*80}\n")
     
     metrics: List[RequestMetric] = []
@@ -825,16 +1829,51 @@ def main() -> None:
     end_time = time.time()
     actual_duration = int(end_time - start_time)
     
-    print(f"\nLoad test completed in {actual_duration}s")
-    print(f"Collected {len(metrics):,} metrics\n")
+    print(f"\n✓ Main load test completed in {actual_duration}s")
+    print(f"  Collected {len(metrics):,} metrics\n")
+    
+    # Run burst test
+    burst_metrics = None
+    if config.include_burst_test:
+        burst_metrics = run_burst_test(config)
+    
+    # Run benchmark tests
+    benchmark_results = None
+    if config.include_benchmark_test:
+        benchmark_results = run_benchmark_tests(config)
+    
+    # Run performance regression tests
+    performance_results = None
+    if config.include_performance_test:
+        performance_results = run_performance_tests(config)
     
     # Generate reports
-    generate_reports(config, metrics, actual_duration)
+    generate_reports(
+        config, 
+        metrics, 
+        actual_duration, 
+        burst_metrics=burst_metrics,
+        benchmark_results=benchmark_results,
+        performance_results=performance_results,
+        health_check=health_check,
+        edge_case_results=edge_case_results,
+    )
+    
+    # Post-test validation
+    overall_stats = aggregate_metrics(metrics, actual_duration)
+    validation_passed = run_post_test_validation(config.base_url, overall_stats, config.strict_validation)
     
     print(f"\n{'='*80}")
-    print(f"Test completed successfully!")
+    if validation_passed:
+        print(f"✓ TEST SUITE COMPLETED SUCCESSFULLY!")
+    else:
+        print(f"⚠ TEST SUITE COMPLETED WITH WARNINGS")
     print(f"Results saved to: {config.output_dir}")
     print(f"{'='*80}\n")
+    
+    # Exit with appropriate code
+    if config.strict_validation and not validation_passed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -1,58 +1,86 @@
 package com.ratelimiter.service;
 
 import com.ratelimiter.dto.RateLimitResponse;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.*;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
-// service for recording metrics related to rate limiting
+@RequiredArgsConstructor
 public class MetricsService {
 
-    // metrics counters and timer for rate limiting operations
-    private final Counter allowedCounter;
-    private final Counter deniedCounter;
-    private final Counter errorCounter;
-    private final Timer checkLatencyTimer;
+    private final MeterRegistry registry;
+    private final AtomicInteger activeKeys = new AtomicInteger(0);
 
-    // initializes the metrics counters and timer
-    public MetricsService(MeterRegistry registry) {
-        this.allowedCounter = Counter.builder("ratelimit.checks.allowed")
-                .description("Number of allowed rate limit checks")
-                .register(registry);
-
-        this.deniedCounter = Counter.builder("ratelimit.checks.denied")
-                .description("Number of denied rate limit checks")
-                .register(registry);
-
-        this.errorCounter = Counter.builder("ratelimit.checks.errors")
-                .description("Number of rate limit check errors")
-                .register(registry);
-
-        this.checkLatencyTimer = Timer.builder("ratelimit.check.latency")
-                .description("Rate limit check latency")
-                .register(registry);
+    @PostConstruct
+    public void init() {
+        // Register gauge once during initialization
+        registry.gauge("ratelimit.keys.active", activeKeys);
     }
 
-    // records the result of a rate limit check and its latency
-    public void recordCheck(RateLimitResponse response, long latencyMicros) {
-        if (response.isAllowed()) {
-            allowedCounter.increment();
-        } else {
-            deniedCounter.increment();
-        }
+    // ─── Core check: tagged by algorithm + result ────────────────────
+    public void recordCheck(RateLimitResponse response, long latencyMicros, String algorithm) {
+        String result = response.isAllowed() ? "allowed" : "denied";
 
-        checkLatencyTimer.record(latencyMicros, TimeUnit.MICROSECONDS);
+        registry.counter("ratelimit.checks.total",
+                "algorithm", algorithm,
+                "result", result)
+                .increment();
+
+        registry.timer("ratelimit.check.duration",
+                "algorithm", algorithm)
+                .record(latencyMicros, TimeUnit.MICROSECONDS);
     }
 
-    // records an error in rate limit checking
+    // ─── Pattern resolution ───────────────────────────────────────────
+    public void recordPatternMatch(String pattern) {
+        registry.counter("ratelimit.pattern.hits",
+                "pattern", pattern)
+                .increment();
+    }
+
+    public void recordPatternMiss() {
+        registry.counter("ratelimit.pattern.misses").increment();
+    }
+
+    // ─── Redis layer ──────────────────────────────────────────────────
+    public void recordRedisOp(String operation, long latencyMicros, boolean success) {
+        registry.counter("ratelimit.redis.ops",
+                "operation", operation,
+                "status", success ? "ok" : "error")
+                .increment();
+
+        registry.timer("ratelimit.redis.duration",
+                "operation", operation)
+                .record(latencyMicros, TimeUnit.MICROSECONDS);
+    }
+
+    // ─── Config cache ─────────────────────────────────────────────────
+    public void recordCacheHit() {
+        registry.counter("ratelimit.cache.hits").increment();
+    }
+
+    public void recordCacheMiss() {
+        registry.counter("ratelimit.cache.misses").increment();
+    }
+
+    // ─── Errors & circuit breaker ─────────────────────────────────────
     public void recordError() {
-        errorCounter.increment();
+        registry.counter("ratelimit.errors").increment();
+    }
+
+    public void recordCircuitBreakerTrip() {
+        registry.counter("ratelimit.cb.trips").increment();
+    }
+
+    // ─── Live gauge ───────────────────────────────────────────────────
+    public void updateActiveKeys(int count) {
+        activeKeys.set(count);
     }
 }
