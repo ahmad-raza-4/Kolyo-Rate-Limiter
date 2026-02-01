@@ -114,7 +114,12 @@ public class SlidingWindowCounterAlgorithm implements RateLimitAlgorithm {
     @Override
     public void reset(String key) {
         String pattern = "ratelimit:swc:" + key + ":*";
-        redisTemplate.delete(redisTemplate.keys(pattern));
-        log.info("Reset Sliding Window Counter for key pattern: {}", pattern);
+        var keys = redisTemplate.keys(pattern);
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+            log.info("Reset Sliding Window Counter for key pattern: {} ({} keys deleted)", pattern, keys.size());
+        } else {
+            log.info("Reset Sliding Window Counter for key pattern: {} (no keys found)", pattern);
+        }
     }
 }
