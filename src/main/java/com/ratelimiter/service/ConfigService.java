@@ -219,10 +219,21 @@ public class ConfigService {
                 return null;
             }
 
-            String algorithmStr = (String) hash.get("algorithm");
-            Integer capacity = (Integer) hash.get("capacity");
-            Double refillRate = ((Number) hash.get("refillRate")).doubleValue();
-            Integer refillPeriod = (Integer) hash.get("refillPeriodSeconds");
+            // Add null checks before casting to prevent NullPointerException
+            Object algorithmObj = hash.get("algorithm");
+            Object capacityObj = hash.get("capacity");
+            Object refillRateObj = hash.get("refillRate");
+            Object refillPeriodObj = hash.get("refillPeriodSeconds");
+
+            if (algorithmObj == null || capacityObj == null || refillRateObj == null || refillPeriodObj == null) {
+                log.warn("Invalid config in Redis - missing required fields for key: {}", redisKey);
+                return null;
+            }
+
+            String algorithmStr = (String) algorithmObj;
+            Integer capacity = (Integer) capacityObj;
+            Double refillRate = ((Number) refillRateObj).doubleValue();
+            Integer refillPeriod = (Integer) refillPeriodObj;
             Integer priority = hash.containsKey("priority") ? (Integer) hash.get("priority") : 0;
 
             // Extract keyPattern from hash or derive from Redis key

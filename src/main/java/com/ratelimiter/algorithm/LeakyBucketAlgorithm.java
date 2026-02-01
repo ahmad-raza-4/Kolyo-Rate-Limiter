@@ -71,7 +71,7 @@ public class LeakyBucketAlgorithm implements RateLimitAlgorithm {
             
             if (allowed == 1) {
                 response = RateLimitResponse.allowed(
-                    config.getCapacity() - queueSize,  // remaining capacity
+                    Math.max(0, config.getCapacity() - queueSize),  // remaining capacity
                     resetTime,
                     getAlgorithmType().name()
                 );
@@ -88,7 +88,7 @@ public class LeakyBucketAlgorithm implements RateLimitAlgorithm {
                 }
 
                 response = RateLimitResponse.denied(
-                    config.getCapacity() - queueSize,
+                    Math.max(0, config.getCapacity() - queueSize),
                     resetTime,
                     retryAfterSeconds,
                     getAlgorithmType().name()
