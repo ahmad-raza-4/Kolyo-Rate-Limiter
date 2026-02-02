@@ -11,11 +11,11 @@ A high-performance, battle-tested rate limiting system supporting **5 industry-s
 
 ## Key Metrics
 
-- **Throughput**: 31,000 - 42,000 requests/second per algorithm (benchmark mode)
-- **Load Test Performance**: 117.78 req/s sustained, P95: 48.5ms, P99: 61.6ms
+- **Throughput**: 28,571 - 40,323 requests/second per algorithm (benchmark mode)
+- **Load Test Performance**: 117.99 req/s sustained, P95: 38.18ms, P99: 51.45ms
 - **Reliability**: 100% success rate under sustained load
 - **Algorithms**: 5 production-ready implementations
-- **Battle-Tested**: Zero errors in 21,200+ request load tests
+- **Battle-Tested**: Zero errors in 14,159+ request load tests
 
 ---
 
@@ -23,11 +23,11 @@ A high-performance, battle-tested rate limiting system supporting **5 industry-s
 
 ### Multiple Rate Limiting Algorithms
 
-- **Token Bucket** - Smooth traffic with burst tolerance (31,055 RPS)
-- **Sliding Window** - Precise rate limiting with no boundary issues (35,335 RPS)
-- **Sliding Window Counter** - Memory-efficient precision (41,841 RPS) **Fastest**
-- **Fixed Window** - Simple, high-performance counters (36,496 RPS)
-- **Leaky Bucket** - Consistent output rate, smooth traffic (42,735 RPS) **Highest Throughput**
+- **Token Bucket** - Smooth traffic with burst tolerance (38,168 RPS)
+- **Sliding Window** - Precise rate limiting with no boundary issues (38,314 RPS)
+- **Sliding Window Counter** - Memory-efficient precision (29,762 RPS)
+- **Fixed Window** - Simple, high-performance counters (28,571 RPS)
+- **Leaky Bucket** - Consistent output rate, smooth traffic (40,323 RPS) **Highest Throughput**
 
 ### Enterprise-Grade Features
 
@@ -35,7 +35,7 @@ A high-performance, battle-tested rate limiting system supporting **5 industry-s
 - **Dynamic Configuration** - Hot-reload configs without restart
 - **Pattern-Based Rules** - Wildcard support for flexible key matching
 - **Comprehensive Monitoring** - Prometheus metrics & Spring Actuator
-- **Sub-Second Response** - Average latency ~22ms under load
+- **Sub-Second Response** - Average latency ~16ms under load
 - **Burst Handling** - Graceful degradation under 3x traffic spikes
 - **Production Ready** - Docker, Kubernetes, comprehensive tests
 
@@ -47,21 +47,21 @@ A high-performance, battle-tested rate limiting system supporting **5 industry-s
 
 | Algorithm | Throughput (RPS) | P95 Latency | Best For |
 |-----------|------------------|-------------|----------|
-| **Leaky Bucket** | **42,735** | 1.92ms | Smooth traffic shaping |
-| **Sliding Window Counter** | **41,841** | 2.15ms | Balance of accuracy & performance |
-| **Fixed Window** | 36,496 | 2.36ms | Simple, predictable limits |
-| **Sliding Window** | 35,335 | 2.30ms | Precise rate limiting |
-| **Token Bucket** | 31,055 | 2.56ms | Burst tolerance required |
+| **Leaky Bucket** | **40,323** | 2.06ms | Smooth traffic shaping |
+| **Sliding Window** | 38,314 | 1.96ms | Precise rate limiting |
+| **Token Bucket** | 38,168 | 2.06ms | Burst tolerance required |
+| **Sliding Window Counter** | 29,762 | 5.39ms | Balance of accuracy & performance |
+| **Fixed Window** | 28,571 | 2.38ms | Simple, predictable limits |
 
-### Load Test Results (180s, 120 RPS target, 20 concurrent clients)
+### Load Test Results (120s, 120 RPS target, 20 concurrent clients)
 
 ```
-Total Requests: 21,200
+Total Requests: 14,159
 Success Rate: 100.00%
-Throughput: 117.78 req/s
-Avg Latency: 22.16 ms
-P95 Latency: 48.51 ms
-P99 Latency: 61.63 ms
+Throughput: 117.99 req/s
+Avg Latency: 15.87 ms
+P95 Latency: 38.18 ms
+P99 Latency: 51.45 ms
 Error Rate: 0.00%
 ```
 
@@ -70,9 +70,9 @@ Error Rate: 0.00%
 ```
 Concurrent Clients: 60
 Target RPS: 360
-Total Requests: 10,680
-P95 Latency: 64.84 ms (+33.7% vs normal)
-P99 Latency: 84.14 ms (+36.5% vs normal)
+Total Requests: 10,634
+P95 Latency: 56.80 ms (+48.8% vs normal)
+P99 Latency: 70.47 ms (+37.0% vs normal)
 Error Rate: 0.00% 
 ```
 
@@ -560,9 +560,9 @@ python comprehensive_load_test.py \
 **Test Results:**
 ```
 Edge Cases: 5/5 PASSED 
-Main Load Test: 21,200 requests, 0 errors 
-Burst Test: 10,680 requests, 0 errors 
-Benchmark Tests: 31k-42k RPS 
+Main Load Test: 14,159 requests, 0 errors 
+Burst Test: 10,634 requests, 0 errors 
+Benchmark Tests: 28k-40k RPS 
 Regression Tests: All within thresholds 
 ```
 
