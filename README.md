@@ -869,8 +869,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Documentation**: 
   - [README.md](README.md) - Main documentation
-  - [DOCKER_GUIDE.md](DOCKER_GUIDE.md) - Comprehensive Docker deployment guide
-  - [PROJECT_GUIDE.md](PROJECT_GUIDE.md) - Deep dive into architecture & implementation
   - Inline code comments
 - **Issues**: [GitHub Issues](https://github.com/yourusername/rate-limiter/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/yourusername/rate-limiter/discussions)
