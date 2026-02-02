@@ -1,0 +1,63 @@
+# Maven build artifacts
+target/
+!target/*.jar
+
+# Maven wrapper
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Python virtual environments (load testing)
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Load testing
+load_testing/
+
+# Data files
+data/
+
+# Logs
+*.log
+logs/
+
+# Test files
+src/test/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Environment files
+.env
+.env.local
+.env.*.local

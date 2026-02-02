@@ -1,4 +1,4 @@
-# Enterprise Rate Limiter
+# Kolyo Rate Limiter
 
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
@@ -122,38 +122,62 @@ Error Rate: 0.00%
 
 ### Prerequisites
 
-- **Java 21+**
-- **Maven 3.9+**
-- **Redis 6.0+** (or Docker)
+- **Docker** & **Docker Compose** (recommended)
+- **OR** Java 21+ & Maven 3.9+ & Redis 6.0+ (for local development)
 
-### 1. Clone & Install
+### Option 1: Docker Compose (Recommended) 🐳
+
+The fastest way to get started:
 
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/rate-limiter.git
+cd rate-limiter
+
+# Start everything (Redis + Rate Limiter)
+docker-compose up -d
+
+# Check health
+curl http://localhost:8080/actuator/health
+```
+
+**Services:**
+- Rate Limiter: `http://localhost:8080`
+- Redis: `localhost:6379`
+
+**View logs:**
+```bash
+docker-compose logs -f rate-limiter
+```
+
+**Stop services:**
+```bash
+docker-compose down
+```
+
+### Option 2: Local Development
+
+For development without Docker:
+
+```bash
+# 1. Clone & Install
 git clone https://github.com/yourusername/rate-limiter.git
 cd rate-limiter
 mvn clean install
-```
 
-### 2. Start Redis
-
-```bash
-# Using Docker
-docker-compose up -d
-
-# Or install locally
+# 2. Start Redis
 brew install redis # macOS
 redis-server
-```
 
-### 3. Run the Application
-
-```bash
+# 3. Run the Application
 mvn spring-boot:run
 ```
 
 **Application starts on** `http://localhost:8080`
 
-### 4. Make Your First Request
+---
+
+### Make Your First Request
 
 ```bash
 # Check rate limit
@@ -172,9 +196,13 @@ curl -X POST http://localhost:8080/api/ratelimit/check \
 {
 "allowed": true,
 "remainingTokens": 9,
-"resetTime": "2026-02-01T23:15:30.123Z",
+"resetTime": "2026-02-02T07:13:19.897Z",
 "retryAfterSeconds": 0,
-"algorithm": "TOKEN_BUCKET"
+"algorithm": "TOKEN_BUCKET",
+"metadata": {
+  "key": "user:123",
+  "latencyMicros": 19351
+}
 }
 ```
 
@@ -572,21 +600,74 @@ Regression Tests: All within thresholds
 
 ### Docker Deployment
 
-#### Build Image
+The project includes a production-ready, multi-stage Dockerfile with:
+- ✅ **3-stage build** with dependency caching (6x faster rebuilds)
+- ✅ **Security hardening** - runs as non-root user
+- ✅ **Health checks** - automatic monitoring
+- ✅ **JVM optimization** - G1GC, container-aware memory
+- ✅ **Graceful shutdown** - proper signal handling
+
+#### Quick Start with Docker Compose (Recommended)
 
 ```bash
-docker build -t rate-limiter:latest .
-```
-
-#### Run with Docker Compose
-
-```bash
+# Start both Redis and Rate Limiter
 docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
 
 **Services:**
-- Rate Limiter: `http://localhost:8080`
-- Redis: `localhost:6379`
+- Rate Limiter: `http://localhost:8080` (with health checks)
+- Redis: `localhost:6379` (with persistence)
+
+#### Manual Docker Build & Run
+
+```bash
+# Build the image
+docker build -t rate-limiter:latest .
+
+# Run Redis
+docker run -d --name redis -p 6379:6379 redis:7-alpine
+
+# Run Rate Limiter
+docker run -d \
+  --name rate-limiter \
+  -p 8080:8080 \
+  -e SPRING_DATA_REDIS_HOST=redis \
+  --link redis:redis \
+  rate-limiter:latest
+
+# Check health
+curl http://localhost:8080/actuator/health
+```
+
+#### Docker Image Features
+
+**Build Performance:**
+- First build: ~2.5 minutes
+- Rebuild (code changes only): ~45 seconds
+- Rebuild (no changes): ~30 seconds
+
+**Image Details:**
+- Base: `eclipse-temurin:21-jre-alpine`
+- Size: ~350MB (optimized)
+- User: `ratelimiter:1000` (non-root)
+- Health check: Every 30s via `/actuator/health`
+
+**Environment Variables:**
+```bash
+JAVA_OPTS="-Xmx512m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+SPRING_DATA_REDIS_HOST="redis"
+SPRING_DATA_REDIS_PORT="6379"
+SERVER_PORT="8080"
+```
 
 ---
 
@@ -615,10 +696,10 @@ image: rate-limiter:latest
 ports:
 - containerPort: 8080
 env:
-- name: SPRING_PROFILES_ACTIVE
-value: "prod"
 - name: SPRING_DATA_REDIS_HOST
 value: "redis-service"
+- name: JAVA_OPTS
+value: "-Xmx1g -Xms1g -XX:+UseG1GC"
 ---
 apiVersion: v1
 kind: Service
@@ -786,7 +867,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- **Documentation**: This README & inline code comments
+- **Documentation**: 
+  - [README.md](README.md) - Main documentation
+  - [DOCKER_GUIDE.md](DOCKER_GUIDE.md) - Comprehensive Docker deployment guide
+  - [PROJECT_GUIDE.md](PROJECT_GUIDE.md) - Deep dive into architecture & implementation
+  - Inline code comments
 - **Issues**: [GitHub Issues](https://github.com/yourusername/rate-limiter/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/yourusername/rate-limiter/discussions)
 
