@@ -10,12 +10,15 @@ import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 
-import java.util.Collections;
-import java.util.Set;
+import java.util.Iterator;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,11 +33,24 @@ class HealthConfigTest {
     @Mock
     private RedisConnection connection;
 
+    @Mock
+    private Cursor<String> cursor;
+
     private HealthConfig healthConfig;
 
     @BeforeEach
     void setUp() {
         healthConfig = new HealthConfig(redisTemplate);
+    }
+
+    /** Helper: set up the scan cursor to return the given keys once, then stop. */
+    private void mockScanReturning(List<String> keys) {
+        Iterator<String> it = keys.iterator();
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+        when(cursor.hasNext()).thenAnswer(inv -> it.hasNext());
+        if (!keys.isEmpty()) {
+            when(cursor.next()).thenAnswer(inv -> it.next());
+        }
     }
 
     @Test
@@ -43,7 +59,7 @@ class HealthConfigTest {
         when(redisTemplate.getConnectionFactory()).thenReturn(connectionFactory);
         when(connectionFactory.getConnection()).thenReturn(connection);
         when(connection.ping()).thenReturn("PONG");
-        when(redisTemplate.keys("ratelimit:*")).thenReturn(Set.of("key1", "key2"));
+        mockScanReturning(List.of("key1", "key2"));
 
         HealthIndicator indicator = healthConfig.redisDetailedHealthIndicator();
 
@@ -63,11 +79,10 @@ class HealthConfigTest {
         when(redisTemplate.getConnectionFactory()).thenReturn(connectionFactory);
         when(connectionFactory.getConnection()).thenReturn(connection);
         when(connection.ping()).thenAnswer(invocation -> {
-            // Simulate slow response
             Thread.sleep(150);
             return "PONG";
         });
-        when(redisTemplate.keys("ratelimit:*")).thenReturn(Collections.emptySet());
+        // Scan is skipped when latencyMs > 100, so no scan stubbing needed
 
         HealthIndicator indicator = healthConfig.redisDetailedHealthIndicator();
 
@@ -87,11 +102,10 @@ class HealthConfigTest {
         when(redisTemplate.getConnectionFactory()).thenReturn(connectionFactory);
         when(connectionFactory.getConnection()).thenReturn(connection);
         when(connection.ping()).thenAnswer(invocation -> {
-            // Simulate moderate delay
             Thread.sleep(60);
             return "PONG";
         });
-        when(redisTemplate.keys("ratelimit:*")).thenReturn(Collections.emptySet());
+        mockScanReturning(List.of());
 
         HealthIndicator indicator = healthConfig.redisDetailedHealthIndicator();
 
@@ -123,12 +137,12 @@ class HealthConfigTest {
     }
 
     @Test
-    void redisDetailedHealthIndicatorShouldHandleNullKeysGracefully() {
+    void redisDetailedHealthIndicatorShouldHandleEmptyScanGracefully() {
         // Given
         when(redisTemplate.getConnectionFactory()).thenReturn(connectionFactory);
         when(connectionFactory.getConnection()).thenReturn(connection);
         when(connection.ping()).thenReturn("PONG");
-        when(redisTemplate.keys("ratelimit:*")).thenReturn(null);
+        mockScanReturning(List.of()); // no ratelimit keys
 
         HealthIndicator indicator = healthConfig.redisDetailedHealthIndicator();
 
@@ -147,7 +161,7 @@ class HealthConfigTest {
         when(redisTemplate.getConnectionFactory()).thenReturn(connectionFactory);
         when(connectionFactory.getConnection()).thenReturn(connection);
         when(connection.ping()).thenReturn("PONG");
-        when(redisTemplate.keys("ratelimit:*")).thenThrow(new RuntimeException("Keys query failed"));
+        when(redisTemplate.scan(any(ScanOptions.class))).thenThrow(new RuntimeException("Scan failed"));
 
         HealthIndicator indicator = healthConfig.redisDetailedHealthIndicator();
 

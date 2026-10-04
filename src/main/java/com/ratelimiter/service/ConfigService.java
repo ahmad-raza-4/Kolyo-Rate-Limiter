@@ -23,6 +23,8 @@ public class ConfigService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final PatternMatcher patternMatcher;
+    // Change 1: wire the Caffeine-backed cache instead of a raw ConcurrentHashMap
+    private final ConfigCacheManager configCacheManager;
 
     @Value("${ratelimiter.default.capacity}")
     private Integer defaultCapacity;
@@ -33,9 +35,9 @@ public class ConfigService {
     @Value("${ratelimiter.default.refill-period-seconds}")
     private Integer defaultRefillPeriod;
 
-    // Simple in-memory cache for performance
-    private final Map<String, RateLimitConfig> configCache = new ConcurrentHashMap<>();
-    private final Map<String, PatternMatcher.CompiledPattern> patternCache = new ConcurrentHashMap<>();
+    // Pattern cache holds compiled pattern + its full config to avoid an extra Redis round-trip on each match
+    private record PatternEntry(PatternMatcher.CompiledPattern compiled, RateLimitConfig config) {}
+    private final Map<String, PatternEntry> patternCache = new ConcurrentHashMap<>();
 
     /**
      * Load all patterns from Redis on startup to avoid repeated Redis calls.
@@ -49,35 +51,35 @@ public class ConfigService {
             PatternMatcher.CompiledPattern compiled = patternMatcher.compile(
                     config.getKeyPattern(),
                     config.getPriority());
-            patternCache.put(config.getKeyPattern(), compiled);
+            patternCache.put(config.getKeyPattern(), new PatternEntry(compiled, config));
         }
         log.info("Loaded {} pattern configurations into cache", patterns.size());
     }
 
     public RateLimitConfig getConfig(String key) {
-        // Check cache first
-        RateLimitConfig cached = configCache.get(key);
+        // Check Caffeine cache first (TTL-based, bounded)
+        RateLimitConfig cached = configCacheManager.getIfPresent(key);
         if (cached != null) {
             return cached;
         }
 
-        // Try exact key match
+        // Try exact key match in Redis
         RateLimitConfig config = getConfigFromRedis("config:key:" + key);
         if (config != null) {
-            configCache.put(key, config);
+            configCacheManager.put(key, config);
             return config;
         }
 
-        // Try pattern matching
+        // Try pattern matching (no extra Redis call — config is embedded in PatternEntry)
         config = findMatchingPattern(key);
         if (config != null) {
-            configCache.put(key, config);
+            configCacheManager.put(key, config);
             return config;
         }
 
         // Return default configuration
         RateLimitConfig defaultConfig = getDefaultConfig();
-        configCache.put(key, defaultConfig);
+        configCacheManager.put(key, defaultConfig);
         return defaultConfig;
     }
 
@@ -92,8 +94,8 @@ public class ConfigService {
         String redisKey = "config:key:" + key;
         saveConfigToRedis(redisKey, config);
 
-        // Invalidate cache
-        configCache.remove(key);
+        // Invalidate the Caffeine cache entry so the next request picks up the new config
+        configCacheManager.invalidate(key);
 
         log.info("Saved key configuration: {}", key);
     }
@@ -115,12 +117,12 @@ public class ConfigService {
         String redisKey = "config:pattern:" + pattern;
         saveConfigToRedis(redisKey, config);
 
-        // Update pattern cache
+        // Update pattern cache — store the compiled pattern AND the config together
         PatternMatcher.CompiledPattern compiled = patternMatcher.compile(pattern, config.getPriority());
-        patternCache.put(pattern, compiled);
+        patternCache.put(pattern, new PatternEntry(compiled, config));
 
-        // Clear config cache since patterns changed
-        configCache.clear();
+        // Clear all Caffeine-cached configs since pattern changes affect any matching key
+        configCacheManager.invalidateAll();
 
         log.info("Saved pattern configuration: {} with priority {}", pattern, config.getPriority());
     }
@@ -128,7 +130,7 @@ public class ConfigService {
     public void deleteKeyConfig(String key) {
         String redisKey = "config:key:" + key;
         redisTemplate.delete(redisKey);
-        configCache.remove(key);
+        configCacheManager.invalidate(key);
         log.info("Deleted key configuration: {}", key);
     }
 
@@ -136,7 +138,7 @@ public class ConfigService {
         String redisKey = "config:pattern:" + pattern;
         redisTemplate.delete(redisKey);
         patternCache.remove(pattern);
-        configCache.clear(); // Clear all since pattern matching changed
+        configCacheManager.invalidateAll(); // pattern removal affects all matching keys
         log.info("Deleted pattern configuration: {}", pattern);
     }
 
@@ -158,38 +160,34 @@ public class ConfigService {
 
     public void reloadConfigurations() {
         log.info("Reloading configurations...");
-        configCache.clear();
+        configCacheManager.invalidateAll();
         patternCache.clear();
         patternMatcher.clearCache();
 
-        // Rebuild pattern cache
+        // Rebuild pattern cache with full PatternEntry (compiled + config)
         List<RateLimitConfig> patterns = getAllPatterns();
         for (RateLimitConfig config : patterns) {
             PatternMatcher.CompiledPattern compiled = patternMatcher.compile(config.getKeyPattern(),
                     config.getPriority());
-            patternCache.put(config.getKeyPattern(), compiled);
+            patternCache.put(config.getKeyPattern(), new PatternEntry(compiled, config));
         }
 
         log.info("Reloaded {} pattern configurations", patterns.size());
     }
 
     private RateLimitConfig findMatchingPattern(String key) {
-        // Use in-memory pattern cache (loaded at startup)
-        List<PatternMatcher.CompiledPattern> patterns = new ArrayList<>(patternCache.values());
+        List<PatternEntry> entries = new ArrayList<>(patternCache.values());
 
-        if (patterns.isEmpty()) {
-            log.warn("No patterns loaded in cache - this shouldn't happen after init()");
+        if (entries.isEmpty()) {
             return null;
         }
 
-        PatternMatcher.CompiledPattern bestMatch = patternMatcher.findBestMatch(key, patterns);
-
-        if (bestMatch != null) {
-            String redisKey = "config:pattern:" + bestMatch.getPattern();
-            return getConfigFromRedis(redisKey);
-        }
-
-        return null;
+        // Find the highest-priority entry whose compiled pattern matches this key
+        return entries.stream()
+                .filter(e -> e.compiled().matches(key))
+                .max(java.util.Comparator.comparingInt(e -> e.compiled().getPriority()))
+                .map(PatternEntry::config)
+                .orElse(null);
     }
 
     private void saveConfigToRedis(String redisKey, RateLimitConfig config) {

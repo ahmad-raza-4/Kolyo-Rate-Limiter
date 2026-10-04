@@ -5,10 +5,11 @@ import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 
 import java.util.List;
-import java.util.Set;
 
 @Configuration
 @RequiredArgsConstructor
@@ -27,20 +28,29 @@ public class HealthConfig {
                 }
                 long latencyMs = System.currentTimeMillis() - t0;
 
-                Set<String> keys = redisTemplate.keys("ratelimit:*");
-                int activeKeys = keys != null ? keys.size() : 0;
-
                 Health.Builder b = Health.up()
-                        .withDetail("latencyMs", latencyMs)
-                        .withDetail("activeKeys", activeKeys);
+                        .withDetail("latencyMs", latencyMs);
 
                 // Degrade health on slow Redis — catches problems before they cascade
                 if (latencyMs > 100) {
                     return Health.down()
                             .withDetail("reason", "Redis latency " + latencyMs + "ms > 100ms threshold")
-                            .withDetail("activeKeys", activeKeys)
+                            .withDetail("latencyMs", latencyMs)
+                            .withDetail("activeKeys", 0)
                             .build();
                 }
+
+                // Change 2: use SCAN instead of KEYS to count active ratelimit keys
+                int activeKeys = 0;
+                ScanOptions options = ScanOptions.scanOptions().match("ratelimit:*").count(100).build();
+                try (Cursor<String> cursor = redisTemplate.scan(options)) {
+                    while (cursor.hasNext()) {
+                        cursor.next();
+                        activeKeys++;
+                    }
+                }
+
+                b.withDetail("activeKeys", activeKeys);
                 if (latencyMs > 50) {
                     b.withDetail("warning", "Redis latency " + latencyMs + "ms approaching threshold");
                 }

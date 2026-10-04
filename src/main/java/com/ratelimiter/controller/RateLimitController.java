@@ -34,12 +34,19 @@ public class RateLimitController {
         log.debug("Rate limit check request: {}", request);
         RateLimitResponse response = rateLimitService.checkLimit(request);
 
+        // Change 4: always include rate limit headers (not just on 429).
+        // This follows GitHub/Stripe/Cloudflare convention so clients can self-regulate.
         if (response.isAllowed()) {
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok()
+                    .header("X-RateLimit-Remaining", String.valueOf(response.getRemainingTokens()))
+                    .header("X-RateLimit-Reset", response.getResetTime() != null
+                            ? response.getResetTime().toString() : "")
+                    .body(response);
         } else {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .header("X-RateLimit-Remaining", String.valueOf(response.getRemainingTokens()))
-                    .header("X-RateLimit-Reset", response.getResetTime().toString())
+                    .header("X-RateLimit-Reset", response.getResetTime() != null
+                            ? response.getResetTime().toString() : "")
                     .header("Retry-After", String.valueOf(response.getRetryAfterSeconds()))
                     .body(response);
         }

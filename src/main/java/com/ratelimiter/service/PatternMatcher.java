@@ -18,24 +18,23 @@ public class PatternMatcher {
 
     public static class CompiledPattern {
         private final String pattern;
-        private final String regex;
+        // Change 5: pre-compile the regex once at construction; String.matches() recompiles every call
+        private final java.util.regex.Pattern compiledRegex;
         private final int priority;
 
         public CompiledPattern(String pattern, int priority) {
             this.pattern = pattern;
             this.priority = priority;
-            this.regex = compilePattern(pattern);
+            this.compiledRegex = java.util.regex.Pattern.compile(buildRegex(pattern));
         }
 
-        private String compilePattern(String pattern) {
-            // Convert wildcard pattern to regex
-            // api:* -> ^api:.*$
-            // user:premium:* -> ^user:premium:.*$
+        private String buildRegex(String pattern) {
+            // Convert wildcard pattern to regex: api:* → ^api:.*$
             return "^" + pattern.replace("*", ".*") + "$";
         }
 
         public boolean matches(String key) {
-            return key.matches(regex);
+            return compiledRegex.matcher(key).matches();
         }
 
         public String getPattern() {

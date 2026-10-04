@@ -110,21 +110,20 @@ class PerformanceControllerTest {
     }
 
     @Test
-    void shouldHandleInvalidRequest() {
+    void shouldHandleInvalidRequest() throws Exception {
         // Given - invalid request with missing required fields
         String invalidRequest = "{}";
 
-        // When/Then - Controller doesn't have validation, so it throws NPE
-        // This documents current behavior; ideally controller should have @Valid
-        assertThrows(Exception.class, () -> 
-            mockMvc.perform(post("/api/performance/run-and-analyze")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(invalidRequest))
-        );
+        // When/Then - Handled by GlobalExceptionHandler returning 500
+        mockMvc.perform(post("/api/performance/run-and-analyze")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(invalidRequest))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.title").value("Internal Server Error"));
     }
 
     @Test
-    void shouldHandleBenchmarkServiceException() {
+    void shouldHandleBenchmarkServiceException() throws Exception {
         // Given
         BenchmarkRequest request = BenchmarkRequest.builder()
                 .algorithm(com.ratelimiter.model.RateLimitAlgorithm.TOKEN_BUCKET)
@@ -139,13 +138,12 @@ class PerformanceControllerTest {
         when(benchmarkService.runBenchmark(any(BenchmarkRequest.class)))
                 .thenThrow(new RuntimeException("Benchmark failed"));
 
-        // When/Then - Controller doesn't have exception handler, so exception propagates
-        // This documents current behavior; ideally should have @ExceptionHandler
-        assertThrows(Exception.class, () -> 
-            mockMvc.perform(post("/api/performance/run-and-analyze")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-        );
+        // When/Then - Handled by GlobalExceptionHandler returning 500
+        mockMvc.perform(post("/api/performance/run-and-analyze")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.title").value("Internal Server Error"));
     }
 
     @Test

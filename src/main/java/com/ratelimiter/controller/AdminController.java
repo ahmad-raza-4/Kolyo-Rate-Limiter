@@ -10,7 +10,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -58,22 +60,18 @@ public class AdminController {
             @RequestParam(defaultValue = "100") int limit) {
 
         List<KeyInfo> keyInfos = new ArrayList<>();
-        Set<String> keys = redisTemplate.keys("ratelimit:*");
+        // Change 2: use SCAN instead of KEYS to avoid blocking Redis
+        List<String> keys = scanKeys("ratelimit:*", limit);
 
-        if (keys != null) {
-            keys.stream()
-                    .limit(limit)
-                    .forEach(key -> {
-                        Long ttl = redisTemplate.getExpire(key);
-                        String type = extractType(key);
-
-                        keyInfos.add(KeyInfo.builder()
-                                .key(key)
-                                .type(type)
-                                .ttl(ttl)
-                                .build());
-                    });
-        }
+        keys.forEach(key -> {
+            Long ttl = redisTemplate.getExpire(key);
+            String type = extractType(key);
+            keyInfos.add(KeyInfo.builder()
+                    .key(key)
+                    .type(type)
+                    .ttl(ttl)
+                    .build());
+        });
 
         return ResponseEntity.ok(keyInfos);
     }
@@ -81,14 +79,13 @@ public class AdminController {
     @GetMapping("/stats")
     @Operation(summary = "Get system statistics", description = "Get statistics about rate limiter usage")
     public ResponseEntity<SystemStats> getSystemStats() {
-        Set<String> allKeys = redisTemplate.keys("*");
-
-        long total = allKeys != null ? allKeys.size() : 0;
+        // Change 2: use SCAN-based counts instead of KEYS
+        long total  = countByPattern("ratelimit:*");
         long bucket = countByPattern("ratelimit:bucket:*");
         long sliding = countByPattern("ratelimit:sliding:*");
-        long fixed = countByPattern("ratelimit:fixed:*");
-        long leaky = countByPattern("ratelimit:leaky:*");
-        long swc = countByPattern("ratelimit:swc:*");
+        long fixed  = countByPattern("ratelimit:fixed:*");
+        long leaky  = countByPattern("ratelimit:leaky:*");
+        long swc    = countByPattern("ratelimit:swc:*");
         long config = countByPattern("config:*");
 
         SystemStats stats = SystemStats.builder()
@@ -107,9 +104,10 @@ public class AdminController {
     @DeleteMapping("/keys/{keyPattern}")
     @Operation(summary = "Reset keys", description = "Delete keys matching pattern (use with caution)")
     public ResponseEntity<Void> resetKeys(@PathVariable String keyPattern) {
-        Set<String> keys = redisTemplate.keys(keyPattern);
+        // Change 2: use SCAN to find keys, then delete in batches
+        List<String> keys = scanKeys(keyPattern, Integer.MAX_VALUE);
 
-        if (keys != null && !keys.isEmpty()) {
+        if (!keys.isEmpty()) {
             redisTemplate.delete(keys);
             log.info("Deleted {} keys matching pattern: {}", keys.size(), keyPattern);
         }
@@ -134,21 +132,31 @@ public class AdminController {
     }
 
     private String extractType(String key) {
-        if (key.contains(":bucket:"))
-            return "TOKEN_BUCKET";
-        if (key.contains(":sliding:"))
-            return "SLIDING_WINDOW";
-        if (key.contains(":fixed:"))
-            return "FIXED_WINDOW";
-        if (key.contains(":leaky:"))
-            return "LEAKY_BUCKET";
-        if (key.contains(":swc:"))
-            return "SLIDING_WINDOW_COUNTER";
+        if (key.contains(":bucket:"))  return "TOKEN_BUCKET";
+        if (key.contains(":sliding:")) return "SLIDING_WINDOW";
+        if (key.contains(":fixed:"))   return "FIXED_WINDOW";
+        if (key.contains(":leaky:"))   return "LEAKY_BUCKET";
+        if (key.contains(":swc:"))     return "SLIDING_WINDOW_COUNTER";
         return "UNKNOWN";
     }
 
+    /**
+     * SCAN-based key lookup — non-blocking, safe for production.
+     * Returns at most {@code limit} keys matching the given pattern.
+     */
+    private List<String> scanKeys(String pattern, int limit) {
+        List<String> result = new ArrayList<>();
+        ScanOptions options = ScanOptions.scanOptions().match(pattern).count(100).build();
+        try (Cursor<String> cursor = redisTemplate.scan(options)) {
+            while (cursor.hasNext() && result.size() < limit) {
+                result.add(cursor.next());
+            }
+        }
+        return result;
+    }
+
+    /** SCAN-based count — no KEYS command. */
     private long countByPattern(String pattern) {
-        Set<String> keys = redisTemplate.keys(pattern);
-        return keys != null ? keys.size() : 0;
+        return scanKeys(pattern, Integer.MAX_VALUE).size();
     }
 }
